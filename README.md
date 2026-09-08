@@ -1,6 +1,6 @@
 # Bulk Image Resizer & Pas Foto
 
-Aplikasi desktop Windows modern berperforma tinggi yang dibangun menggunakan **C# .NET 8 WPF** untuk kompresi ukuran file secara cerdas dan batch resizing pas foto (2x3, 3x4, 4x6, 1:1, atau kustom) secara instan.
+Aplikasi desktop Windows modern yang dibangun menggunakan **C# .NET 8 WPF** untuk kompresi ukuran file dan batch resizing pas foto (2x3, 3x4, 4x6, 1:1, atau kustom) secara instan.
 
 ---
 
