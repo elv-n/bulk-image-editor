@@ -1,0 +1,28 @@
+<UserControl x:Class="ImageResizerCSharp.Controls.LoadingSpinner"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             mc:Ignorable="d"
+             x:Name="SpinnerRoot"
+             Width="24" Height="24">
+    <Viewbox Stretch="Uniform">
+        <Grid Width="24" Height="24" RenderTransformOrigin="0.5,0.5">
+            <Grid.RenderTransform>
+                <RotateTransform x:Name="SpinnerRotate" Angle="0"/>
+            </Grid.RenderTransform>
+            <!-- Background faint track -->
+            <Ellipse Width="19" Height="19"
+                     Stroke="{Binding TrackColor, ElementName=SpinnerRoot}"
+                     StrokeThickness="{Binding StrokeThickness, ElementName=SpinnerRoot}"
+                     HorizontalAlignment="Center"
+                     VerticalAlignment="Center"/>
+            <!-- Rotating foreground arc (270 degrees) -->
+            <Path Stroke="{Binding SpinnerColor, ElementName=SpinnerRoot}"
+                  StrokeThickness="{Binding StrokeThickness, ElementName=SpinnerRoot}"
+                  StrokeStartLineCap="Round"
+                  StrokeEndLineCap="Round"
+                  Data="M 12,2.5 A 9.5,9.5 0 1 1 2.5,12"/>
+        </Grid>
+    </Viewbox>
+</UserControl>

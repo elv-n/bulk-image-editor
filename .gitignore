@@ -1,0 +1,22 @@
+# Visual Studio & IDE files
+.vs/
+*.user
+*.userosscache
+*.sln.docstates
+.vscode/
+.idea/
+
+# Build artifacts
+[Bb]in/
+[Oo]bj/
+publish/
+
+# Gemini / Antigravity Agent configurations (Pengecualian .agents)
+.agents/
+AGENTS.md
+
+# Operating System Files
+Thumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+*.DS_Store
