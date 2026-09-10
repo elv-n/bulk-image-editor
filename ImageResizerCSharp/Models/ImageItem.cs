@@ -16,6 +16,24 @@ namespace ImageResizerCSharp.Models
         Error
     }
 
+    public record NormalizedCropRect(double X, double Y, double Width, double Height)
+    {
+        public SixLabors.ImageSharp.Rectangle ToImageSharpRect(int imageWidth, int imageHeight)
+        {
+            int rx = (int)Math.Round(X * imageWidth);
+            int ry = (int)Math.Round(Y * imageHeight);
+            int rw = (int)Math.Round(Width * imageWidth);
+            int rh = (int)Math.Round(Height * imageHeight);
+
+            rx = Math.Clamp(rx, 0, Math.Max(0, imageWidth - 10));
+            ry = Math.Clamp(ry, 0, Math.Max(0, imageHeight - 10));
+            rw = Math.Clamp(rw, 10, imageWidth - rx);
+            rh = Math.Clamp(rh, 10, imageHeight - ry);
+
+            return new SixLabors.ImageSharp.Rectangle(rx, ry, rw, rh);
+        }
+    }
+
     public class ImageItem : INotifyPropertyChanged
     {
         private bool _isChecked = true;
@@ -27,10 +45,28 @@ namespace ImageResizerCSharp.Models
         private int _originalWidth;
         private int _originalHeight;
         private string _dimensionsText = "memuat...";
+        private NormalizedCropRect? _customCrop;
 
         public string FilePath { get; }
         public string FileName { get; }
         public long FileSize { get; }
+
+        public NormalizedCropRect? CustomCrop
+        {
+            get => _customCrop;
+            set
+            {
+                if (_customCrop != value)
+                {
+                    _customCrop = value;
+                    OnPropertyChanged();
+                    OnPropertyChanged(nameof(HasCustomCrop));
+                    OnPropertyChanged(nameof(InfoText));
+                }
+            }
+        }
+
+        public bool HasCustomCrop => _customCrop != null;
 
         public bool IsChecked
         {
@@ -93,7 +129,8 @@ namespace ImageResizerCSharp.Models
             get
             {
                 var tag = IsOverLimit ? " • Di atas batas" : "";
-                return $"{FormattedSize} • {DimensionsText}{tag}";
+                var cropTag = HasCustomCrop ? " • ✂ Crop" : "";
+                return $"{FormattedSize} • {DimensionsText}{cropTag}{tag}";
             }
         }
 

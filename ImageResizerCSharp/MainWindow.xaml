@@ -6,7 +6,7 @@
         xmlns:models="clr-namespace:ImageResizerCSharp.Models"
         xmlns:controls="clr-namespace:ImageResizerCSharp.Controls"
         mc:Ignorable="d"
-        Title="Bulk Image Resizer &amp; Pas Foto"
+        Title="Bulk Image Editor"
         Width="1260" Height="880"
         MinWidth="1060" MinHeight="720"
         WindowStartupLocation="CenterScreen"
@@ -15,9 +15,9 @@
 
     <Grid>
         <Grid.RowDefinitions>
-            <RowDefinition Height="62"/> <!-- Top Bar -->
-            <RowDefinition Height="*"/>  <!-- Main Content -->
-            <RowDefinition Height="76"/> <!-- Bottom Bar -->
+            <RowDefinition Height="62"/>    <!-- Top Bar -->
+            <RowDefinition Height="*"/>     <!-- Main Content -->
+            <RowDefinition Height="Auto"/>  <!-- Bottom Bar -->
         </Grid.RowDefinitions>
 
         <!-- ══════════════════════════ 1. TOP BAR ══════════════════════════ -->
@@ -25,78 +25,91 @@
             <Grid Margin="24,0">
                 <StackPanel Orientation="Vertical" VerticalAlignment="Center">
                     <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                        <TextBlock Text="Bulk Image Resizer" FontSize="18" FontWeight="Bold" Foreground="{StaticResource TextPrimaryBrush}" VerticalAlignment="Center"/>
-                        <Border Background="{StaticResource AccentBgBrush}" CornerRadius="6" Padding="8,2" Margin="12,0,0,0" VerticalAlignment="Center">
-                            <TextBlock Text="Pas Foto &amp; Batch" FontSize="11" FontWeight="SemiBold" Foreground="{StaticResource AccentBrush}"/>
-                        </Border>
+                        <TextBlock Text="Bulk Image Editor" FontSize="18" FontWeight="Bold" Foreground="{StaticResource TextPrimaryBrush}" VerticalAlignment="Center"/>
                     </StackPanel>
                     <TextBlock Text="Kompresi ukuran file dan resize pas foto (2x3, 3x4, 4x6) secara instan" FontSize="11" Foreground="{StaticResource TextSecondaryBrush}" Margin="0,2,0,0"/>
                 </StackPanel>
             </Grid>
         </Border>
 
-        <!-- ══════════════════════════ 2. MAIN CONTENT ══════════════════════════ -->
-        <Grid Grid.Row="1" Margin="20,14">
+        <!-- ══════════════════════════ 2. MAIN CONTENT (3-COLUMN WORKSPACE) ══════════════════════════ -->
+        <Grid Grid.Row="1" Margin="20,12,20,12">
             <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="6*" MinWidth="470"/> <!-- Left: File Queue -->
-                <ColumnDefinition Width="14"/>                <!-- Column Gap -->
-                <ColumnDefinition Width="5*" MinWidth="450"/> <!-- Right: Preview & Settings -->
+                <ColumnDefinition Width="290" MinWidth="260"/>
+                <!-- Col 0: File Queue -->
+                <ColumnDefinition Width="12"/>
+                <!-- Gap -->
+                <ColumnDefinition Width="*" MinWidth="380"/>
+                <!-- Col 2: Big Preview Canvas -->
+                <ColumnDefinition Width="12"/>
+                <!-- Gap -->
+                <ColumnDefinition Width="360" MinWidth="340"/>
+                <!-- Col 4: Settings in ScrollViewer -->
             </Grid.ColumnDefinitions>
 
-            <!-- ── LEFT COLUMN: FILE QUEUE ── -->
+            <!-- ── LEFT COLUMN (COL 0): FILE QUEUE ── -->
             <Grid Grid.Column="0">
                 <Grid.RowDefinitions>
-                    <RowDefinition Height="Auto"/> <!-- Source Folder Bar -->
-                    <RowDefinition Height="*"/>    <!-- File List Card -->
+                    <RowDefinition Height="Auto"/>
+                    <!-- Source Folder Bar -->
+                    <RowDefinition Height="*"/>
+                    <!-- File List Card -->
                 </Grid.RowDefinitions>
 
                 <!-- Source Folder Bar -->
-                <Border Grid.Row="0" Background="{StaticResource BgCardBrush}" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1" CornerRadius="10" Padding="14,10" Margin="0,0,0,10">
+                <Border Grid.Row="0" Background="{StaticResource BgCardBrush}" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1" CornerRadius="10" Padding="12,10" Margin="0,0,0,10">
                     <Grid>
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="Auto"/>
-                            <ColumnDefinition Width="*"/>
-                            <ColumnDefinition Width="Auto"/>
-                        </Grid.ColumnDefinitions>
-                        <TextBlock Grid.Column="0" Text="Folder Sumber:" FontWeight="SemiBold" FontSize="12" Foreground="{StaticResource TextPrimaryBrush}" VerticalAlignment="Center" Margin="0,0,10,0"/>
-                        <TextBox Grid.Column="1" x:Name="txtSourceFolder" Height="36" IsReadOnly="True" VerticalContentAlignment="Center" Margin="0,0,8,0" Text="Pilih folder berisi gambar..."/>
-                        <Button Grid.Column="2" x:Name="btnBrowseSource" Content="Browse..." Style="{StaticResource PrimaryButtonStyle}" Height="36" MinWidth="95" Padding="14,6" Click="BtnBrowseSource_Click"/>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                        </Grid.RowDefinitions>
+                        <TextBlock Grid.Row="0" Text="Folder Sumber:" FontWeight="SemiBold" FontSize="11" Foreground="{StaticResource TextPrimaryBrush}" Margin="0,0,0,4"/>
+                        <Grid Grid.Row="1">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBox Grid.Column="0" x:Name="txtSourceFolder" Height="34" IsReadOnly="True" VerticalContentAlignment="Center" Margin="0,0,6,0" Text="Pilih folder gambar..."/>
+                            <Button Grid.Column="1" x:Name="btnBrowseSource" Content="Browse..." Style="{StaticResource PrimaryButtonStyle}" Height="34" Padding="10,4" Click="BtnBrowseSource_Click"/>
+                        </Grid>
                     </Grid>
                 </Border>
 
                 <!-- File Queue Card (Full Height) -->
-                <Border Grid.Row="1" Background="{StaticResource BgCardBrush}" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1" CornerRadius="10" Padding="14,12">
+                <Border Grid.Row="1" Background="{StaticResource BgCardBrush}" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1" CornerRadius="10" Padding="12,12">
                     <Grid>
                         <Grid.RowDefinitions>
-                            <RowDefinition Height="Auto"/> <!-- Action / Summary Bar -->
-                            <RowDefinition Height="*"/>    <!-- Scrollable ListView -->
+                            <RowDefinition Height="Auto"/>
+                            <!-- Action / Summary Bar -->
+                            <RowDefinition Height="*"/>
+                            <!-- Scrollable ListView -->
                         </Grid.RowDefinitions>
 
                         <!-- Action Bar -->
-                        <Grid Grid.Row="0" Margin="0,0,0,10">
-                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                                <TextBlock x:Name="txtFileListHeader" Text="Daftar Foto (0)" FontWeight="Bold" FontSize="14" Foreground="{StaticResource TextPrimaryBrush}"/>
-                                <TextBlock x:Name="txtFileListSummary" Text="" FontSize="11" Foreground="{StaticResource TextSecondaryBrush}" Margin="10,2,0,0"/>
+                        <Grid Grid.Row="0" Margin="0,0,0,8">
+                            <StackPanel Orientation="Vertical" VerticalAlignment="Center">
+                                <TextBlock x:Name="txtFileListHeader" Text="Daftar Foto (0)" FontWeight="Bold" FontSize="13" Foreground="{StaticResource TextPrimaryBrush}"/>
+                                <TextBlock x:Name="txtFileListSummary" Text="" FontSize="11" Foreground="{StaticResource TextSecondaryBrush}"/>
                                 <!-- Inline loading indicator while reading metadata/thumbnails -->
-                                <StackPanel x:Name="pnlHeaderSpinner" Orientation="Horizontal" VerticalAlignment="Center" Margin="12,2,0,0" Visibility="Collapsed">
-                                    <controls:LoadingSpinner Width="13" Height="13" SpinnerColor="{StaticResource AccentBrush}" TrackColor="{StaticResource AccentBgBrush}" StrokeThickness="2" Margin="0,0,6,0"/>
-                                    <TextBlock x:Name="txtHeaderSpinnerMsg" Text="Membaca info..." FontSize="11" Foreground="{StaticResource AccentBrush}"/>
+                                <StackPanel x:Name="pnlHeaderSpinner" Orientation="Horizontal" VerticalAlignment="Center" Margin="0,2,0,0" Visibility="Collapsed">
+                                    <controls:LoadingSpinner Width="12" Height="12" SpinnerColor="{StaticResource AccentBrush}" TrackColor="{StaticResource AccentBgBrush}" StrokeThickness="2" Margin="0,0,6,0"/>
+                                    <TextBlock x:Name="txtHeaderSpinnerMsg" Text="Membaca info..." FontSize="10" Foreground="{StaticResource AccentBrush}"/>
                                 </StackPanel>
                             </StackPanel>
-                            <Button x:Name="btnToggleSelectAll" Content="Pilih Semua" Style="{StaticResource SecondaryButtonStyle}" Height="30" MinWidth="105" Padding="14,6" HorizontalAlignment="Right" Click="BtnToggleSelectAll_Click"/>
+                            <Button x:Name="btnToggleSelectAll" Content="Pilih Semua" Style="{StaticResource SecondaryButtonStyle}" Height="28" Padding="10,4" HorizontalAlignment="Right" VerticalAlignment="Top" Click="BtnToggleSelectAll_Click"/>
                         </Grid>
 
                         <!-- Empty State View -->
-                        <StackPanel x:Name="pnlEmptyState" Grid.Row="1" VerticalAlignment="Center" HorizontalAlignment="Center">
-                            <TextBlock Text="Belum Ada Foto" FontSize="14" FontWeight="SemiBold" Foreground="{StaticResource TextSecondaryBrush}" HorizontalAlignment="Center" Margin="0,0,0,4"/>
-                            <TextBlock Text="Pilih folder sumber di bagian atas untuk memuat daftar foto." FontSize="11" Foreground="{StaticResource TextMutedBrush}" HorizontalAlignment="Center"/>
+                        <StackPanel x:Name="pnlEmptyState" Grid.Row="1" VerticalAlignment="Center" HorizontalAlignment="Center" Margin="10">
+                            <TextBlock Text="Belum Ada Foto" FontSize="13" FontWeight="SemiBold" Foreground="{StaticResource TextSecondaryBrush}" HorizontalAlignment="Center" Margin="0,0,0,4"/>
+                            <TextBlock Text="Pilih folder sumber di atas." FontSize="11" Foreground="{StaticResource TextMutedBrush}" HorizontalAlignment="Center"/>
                         </StackPanel>
 
                         <!-- Loading State View (Active while scanning directory) -->
                         <StackPanel x:Name="pnlLoadingState" Grid.Row="1" VerticalAlignment="Center" HorizontalAlignment="Center" Visibility="Collapsed">
-                            <controls:LoadingSpinner Width="36" Height="36" SpinnerColor="{StaticResource AccentBrush}" TrackColor="{StaticResource BgInputBrush}" StrokeThickness="3" HorizontalAlignment="Center" Margin="0,0,0,12"/>
-                            <TextBlock Text="Memuat Daftar Foto..." FontSize="14" FontWeight="SemiBold" Foreground="{StaticResource TextPrimaryBrush}" HorizontalAlignment="Center" Margin="0,0,0,4"/>
-                            <TextBlock x:Name="txtLoadingStateSub" Text="Memindai file gambar dari folder sumber..." FontSize="11" Foreground="{StaticResource TextSecondaryBrush}" HorizontalAlignment="Center"/>
+                            <controls:LoadingSpinner Width="32" Height="32" SpinnerColor="{StaticResource AccentBrush}" TrackColor="{StaticResource BgInputBrush}" StrokeThickness="3" HorizontalAlignment="Center" Margin="0,0,0,10"/>
+                            <TextBlock Text="Memuat Daftar..." FontSize="13" FontWeight="SemiBold" Foreground="{StaticResource TextPrimaryBrush}" HorizontalAlignment="Center" Margin="0,0,0,2"/>
+                            <TextBlock x:Name="txtLoadingStateSub" Text="Memindai file gambar..." FontSize="11" Foreground="{StaticResource TextSecondaryBrush}" HorizontalAlignment="Center"/>
                         </StackPanel>
 
                         <!-- File ListView (Virtualized StackPanel for 60fps scrolling) -->
@@ -117,7 +130,7 @@
                                     <Setter Property="Template">
                                         <Setter.Value>
                                             <ControlTemplate TargetType="ListViewItem">
-                                                <Border x:Name="itemBorder" Background="{StaticResource BgCardBrush}" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1" CornerRadius="8" Height="54" Padding="10,0">
+                                                <Border x:Name="itemBorder" Background="{StaticResource BgCardBrush}" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1" CornerRadius="8" Height="52" Padding="8,0">
                                                     <ContentPresenter VerticalAlignment="Center"/>
                                                 </Border>
                                                 <ControlTemplate.Triggers>
@@ -139,24 +152,28 @@
                                 <DataTemplate DataType="{x:Type models:ImageItem}">
                                     <Grid>
                                         <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="Auto"/> <!-- Checkbox -->
-                                            <ColumnDefinition Width="Auto"/> <!-- Micro Thumbnail -->
-                                            <ColumnDefinition Width="*"/>    <!-- Filename & Specs -->
-                                            <ColumnDefinition Width="Auto"/> <!-- Status -->
+                                            <ColumnDefinition Width="Auto"/>
+                                            <!-- Checkbox -->
+                                            <ColumnDefinition Width="Auto"/>
+                                            <!-- Micro Thumbnail -->
+                                            <ColumnDefinition Width="*"/>
+                                            <!-- Filename & Specs -->
+                                            <ColumnDefinition Width="Auto"/>
+                                            <!-- Status -->
                                         </Grid.ColumnDefinitions>
 
                                         <!-- Checkbox -->
-                                        <CheckBox Grid.Column="0" IsChecked="{Binding IsChecked, Mode=TwoWay}" VerticalAlignment="Center" Margin="0,0,10,0"/>
+                                        <CheckBox Grid.Column="0" IsChecked="{Binding IsChecked, Mode=TwoWay}" VerticalAlignment="Center" Margin="0,0,8,0"/>
 
-                                        <!-- Micro Photo Thumbnail (38x38 px) -->
-                                        <Border Grid.Column="1" Width="38" Height="38" CornerRadius="6" Background="{StaticResource BgInputBrush}" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1" Margin="0,0,10,0" ClipToBounds="True">
+                                        <!-- Micro Photo Thumbnail (36x36 px) -->
+                                        <Border Grid.Column="1" Width="36" Height="36" CornerRadius="6" Background="{StaticResource BgInputBrush}" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1" Margin="0,0,8,0" ClipToBounds="True">
                                             <Image Source="{Binding Thumbnail}" Stretch="UniformToFill"/>
                                         </Border>
 
                                         <!-- Filename & Specs Text Stack -->
                                         <StackPanel Grid.Column="2" VerticalAlignment="Center">
-                                            <TextBlock Text="{Binding FileName}" FontWeight="SemiBold" FontSize="13" Foreground="{StaticResource TextPrimaryBrush}" TextTrimming="CharacterEllipsis"/>
-                                            <TextBlock Text="{Binding InfoText}" FontSize="11" Margin="0,2,0,0">
+                                            <TextBlock Text="{Binding FileName}" FontWeight="SemiBold" FontSize="12" Foreground="{StaticResource TextPrimaryBrush}" TextTrimming="CharacterEllipsis"/>
+                                            <TextBlock Text="{Binding InfoText}" FontSize="10" Margin="0,1,0,0">
                                                 <TextBlock.Style>
                                                     <Style TargetType="TextBlock">
                                                         <Setter Property="Foreground" Value="{StaticResource SuccessBrush}"/>
@@ -171,8 +188,8 @@
                                         </StackPanel>
 
                                         <!-- Status Indicator -->
-                                        <StackPanel Grid.Column="3" Orientation="Horizontal" VerticalAlignment="Center" Margin="6,0,0,0">
-                                            <controls:LoadingSpinner Width="12" Height="12" SpinnerColor="{StaticResource WarningBrush}" TrackColor="{StaticResource BgInputBrush}" StrokeThickness="2" Margin="0,0,5,0">
+                                        <StackPanel Grid.Column="3" Orientation="Horizontal" VerticalAlignment="Center" Margin="4,0,0,0">
+                                            <controls:LoadingSpinner Width="11" Height="11" SpinnerColor="{StaticResource WarningBrush}" TrackColor="{StaticResource BgInputBrush}" StrokeThickness="2" Margin="0,0,4,0">
                                                 <controls:LoadingSpinner.Style>
                                                     <Style TargetType="{x:Type controls:LoadingSpinner}">
                                                         <Setter Property="Visibility" Value="Collapsed"/>
@@ -184,7 +201,7 @@
                                                     </Style>
                                                 </controls:LoadingSpinner.Style>
                                             </controls:LoadingSpinner>
-                                            <TextBlock Text="{Binding StatusMessage}" FontSize="11" FontWeight="SemiBold">
+                                            <TextBlock Text="{Binding StatusMessage}" FontSize="10" FontWeight="SemiBold">
                                                 <TextBlock.Style>
                                                     <Style TargetType="TextBlock">
                                                         <Setter Property="Foreground" Value="{StaticResource TextSecondaryBrush}"/>
@@ -211,55 +228,184 @@
                 </Border>
             </Grid>
 
-            <!-- ── RIGHT COLUMN: PREVIEW & SETTINGS ── -->
-            <Grid Grid.Column="2">
-                <Grid.RowDefinitions>
-                    <RowDefinition Height="1.1*"/> <!-- Preview Card -->
-                    <RowDefinition Height="Auto"/> <!-- Settings Card -->
-                </Grid.RowDefinitions>
+            <!-- ── CENTER COLUMN (COL 2): LARGE PREVIEW CANVAS (FULL HEIGHT!) ── -->
+            <Border Grid.Column="2" Background="{StaticResource BgCardBrush}" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1" CornerRadius="10" Padding="14,12">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <!-- Header & AI Action Bar -->
+                        <RowDefinition Height="*"/>
+                        <!-- Big Image Canvas -->
+                        <RowDefinition Height="Auto"/>
+                        <!-- Metadata Specs Bar -->
+                    </Grid.RowDefinitions>
 
-                <!-- Preview Card (Top Half) -->
-                <Border Grid.Row="0" Background="{StaticResource BgCardBrush}" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1" CornerRadius="10" Padding="14,10" Margin="0,0,0,10">
-                    <Grid>
-                        <Grid.RowDefinitions>
-                            <RowDefinition Height="Auto"/> <!-- Header -->
-                            <RowDefinition Height="*"/>    <!-- Image Canvas -->
-                            <RowDefinition Height="Auto"/> <!-- Metadata Specs Bar -->
-                        </Grid.RowDefinitions>
+                    <!-- Header & AI Action Bar -->
+                    <Grid Grid.Row="0" Margin="0,0,0,8">
+                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                            <TextBlock Text="Preview Foto" FontWeight="Bold" FontSize="14" Foreground="{StaticResource TextPrimaryBrush}" VerticalAlignment="Center"/>
 
-                        <!-- Header -->
-                        <TextBlock Grid.Row="0" Text="Preview Gambar" FontWeight="Bold" FontSize="14" Foreground="{StaticResource TextPrimaryBrush}" Margin="0,0,0,6"/>
+                            <!-- Toggle Crop Mode Button -->
+                            <ToggleButton x:Name="btnToggleCropMode" Content="✂ Crop Bebas" Style="{StaticResource CropToggleButtonStyle}" Margin="10,0,0,0" Click="BtnToggleCropMode_Click" ToolTip="Aktifkan kotak pemotongan bebas interaktif di kanvas"/>
 
-                        <!-- Image Preview Box -->
-                        <Border Grid.Row="1" Background="{StaticResource BgPreviewBrush}" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1" CornerRadius="8" Margin="0,0,0,6">
-                            <Grid>
-                                <StackPanel x:Name="pnlPreviewEmpty" VerticalAlignment="Center" HorizontalAlignment="Center">
-                                    <TextBlock Text="Pilih foto di daftar sebelah kiri&#x0a;untuk melihat preview" FontSize="11" Foreground="{StaticResource TextMutedBrush}" TextAlignment="Center"/>
+                            <!-- Ratio Selector when Crop Mode is Active -->
+                            <StackPanel x:Name="pnlCropRatioOptions" Orientation="Horizontal" Margin="6,0,0,0" VerticalAlignment="Center" Visibility="Collapsed">
+                                <RadioButton x:Name="rbCropRatioFree" Content="Bebas" GroupName="CropRatio" IsChecked="True" Style="{StaticResource SegmentedRadioStyle}" FontSize="10" Padding="6,3" Margin="2,0" Checked="CropRatio_Checked"/>
+                                <RadioButton x:Name="rbCropRatio2x3" Content="2:3" GroupName="CropRatio" Style="{StaticResource SegmentedRadioStyle}" FontSize="10" Padding="6,3" Margin="2,0" Checked="CropRatio_Checked"/>
+                                <RadioButton x:Name="rbCropRatio3x4" Content="3:4" GroupName="CropRatio" Style="{StaticResource SegmentedRadioStyle}" FontSize="10" Padding="6,3" Margin="2,0" Checked="CropRatio_Checked"/>
+                                <RadioButton x:Name="rbCropRatio4x6" Content="4:6" GroupName="CropRatio" Style="{StaticResource SegmentedRadioStyle}" FontSize="10" Padding="6,3" Margin="2,0" Checked="CropRatio_Checked"/>
+                                <RadioButton x:Name="rbCropRatio1x1" Content="1:1" GroupName="CropRatio" Style="{StaticResource SegmentedRadioStyle}" FontSize="10" Padding="6,3" Margin="2,0" Checked="CropRatio_Checked"/>
+
+                                <Button x:Name="btnResetCrop" Content="Reset" Style="{StaticResource SecondaryButtonStyle}" Height="25" Padding="7,2" FontSize="10" Margin="4,0,0,0" Click="BtnResetCrop_Click" ToolTip="Hapus crop manual dan kembali ke ukuran penuh"/>
+                            </StackPanel>
+                        </StackPanel>
+                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
+                            <!-- AI Processing Indicator -->
+                            <StackPanel x:Name="pnlAiLoading" Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,8,0" Visibility="Collapsed">
+                                <controls:LoadingSpinner Width="13" Height="13" SpinnerColor="{StaticResource AccentBrush}" TrackColor="#20000000" StrokeThickness="2" Margin="0,0,6,0"/>
+                                <TextBlock Text="AI Matting..." FontSize="11" FontWeight="SemiBold" Foreground="{StaticResource AccentBrush}"/>
+                            </StackPanel>
+                            <!-- Active AI Badge -->
+                            <Border x:Name="badgeAiPreviewActive" Background="#16A34A" CornerRadius="4" Padding="7,4" Margin="0,0,8,0" VerticalAlignment="Center" Visibility="Collapsed">
+                                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                    <TextBlock Text="●" FontSize="8" Foreground="#FFFFFF" Margin="0,0,4,0"/>
+                                    <TextBlock Text="Preview AI Aktif" FontSize="10.5" FontWeight="Bold" Foreground="#FFFFFF"/>
                                 </StackPanel>
-                                <Image x:Name="imgPreview" Stretch="Uniform" Margin="8"/>
-                            </Grid>
-                        </Border>
-
-                        <!-- Specs Bar -->
-                        <Grid Grid.Row="2" Margin="4,2">
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="*"/>
-                                <ColumnDefinition Width="*"/>
-                                <ColumnDefinition Width="*"/>
-                            </Grid.ColumnDefinitions>
-                            <TextBlock Grid.Column="0" x:Name="txtSpecDims" Text="Resolusi: -" FontSize="11" Foreground="{StaticResource TextSecondaryBrush}" HorizontalAlignment="Left"/>
-                            <TextBlock Grid.Column="1" x:Name="txtSpecSize" Text="Ukuran: -" FontSize="11" FontWeight="SemiBold" Foreground="{StaticResource TextSecondaryBrush}" HorizontalAlignment="Center"/>
-                            <TextBlock Grid.Column="2" x:Name="txtSpecFmt" Text="Format: -" FontSize="11" Foreground="{StaticResource TextSecondaryBrush}" HorizontalAlignment="Right"/>
-                        </Grid>
+                            </Border>
+                            <!-- Compare with original button -->
+                            <Button x:Name="btnResetPreview" Content="Bandingkan Asli" Style="{StaticResource SecondaryButtonStyle}" Height="28" Padding="10,2" Visibility="Collapsed" Click="BtnResetPreview_Click" ToolTip="Klik untuk beralih antara foto asli dan preview AI"/>
+                        </StackPanel>
                     </Grid>
-                </Border>
 
-                <!-- Settings Card (Bottom Half) -->
-                <Border Grid.Row="1" Background="{StaticResource BgCardBrush}" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1" CornerRadius="10" Padding="16,14">
+                    <!-- Big Image Canvas Box (Expands to fill entire height and width) -->
+                    <Border Grid.Row="1" Background="{StaticResource BgPreviewBrush}" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1" CornerRadius="8" Margin="0,0,0,8" ClipToBounds="True">
+                        <Grid x:Name="gridPreviewContainer" SizeChanged="GridPreviewContainer_SizeChanged">
+                            <!-- Checkerboard/Empty placeholder -->
+                            <StackPanel x:Name="pnlPreviewEmpty" VerticalAlignment="Center" HorizontalAlignment="Center">
+                                <Border Width="48" Height="48" CornerRadius="24" Background="{StaticResource BgInputBrush}" Margin="0,0,0,8" HorizontalAlignment="Center">
+                                    <TextBlock Text="🖼" FontSize="20" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                </Border>
+                                <TextBlock Text="Pilih foto di daftar sebelah kiri" FontSize="13" FontWeight="SemiBold" Foreground="{StaticResource TextSecondaryBrush}" TextAlignment="Center"/>
+                                <TextBlock Text="Preview pasfoto &amp; AI background akan tampil di sini" FontSize="11" Foreground="{StaticResource TextMutedBrush}" TextAlignment="Center" Margin="0,2,0,0"/>
+                            </StackPanel>
+
+                            <!-- Responsive Image Display -->
+                            <Image x:Name="imgPreview" Stretch="Uniform" Margin="10" RenderOptions.BitmapScalingMode="HighQuality"/>
+
+                            <!-- Interactive Crop Overlay Canvas -->
+                            <Canvas x:Name="cropCanvas" Visibility="Collapsed" ClipToBounds="True">
+                                <!-- Dimmed Overlay Path outside Crop Box -->
+                                <Path x:Name="cropMaskPath" Fill="#75000000" IsHitTestVisible="False"/>
+
+                                <!-- Interactive Move Thumb (the Crop Box itself) -->
+                                <Thumb x:Name="cropBoxThumb" Cursor="SizeAll" DragDelta="CropBoxThumb_DragDelta">
+                                    <Thumb.Template>
+                                        <ControlTemplate TargetType="Thumb">
+                                            <Border BorderBrush="#3B82F6" BorderThickness="2" Background="#153B82F6">
+                                                <!-- Grid Rule of Thirds Lines -->
+                                                <Grid IsHitTestVisible="False">
+                                                    <Grid.RowDefinitions>
+                                                        <RowDefinition Height="*"/>
+                                                        <RowDefinition Height="*"/>
+                                                        <RowDefinition Height="*"/>
+                                                    </Grid.RowDefinitions>
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="*"/>
+                                                        <ColumnDefinition Width="*"/>
+                                                        <ColumnDefinition Width="*"/>
+                                                    </Grid.ColumnDefinitions>
+                                                    <Rectangle Grid.Row="0" Grid.ColumnSpan="3" Height="1" Fill="#60FFFFFF" VerticalAlignment="Bottom"/>
+                                                    <Rectangle Grid.Row="1" Grid.ColumnSpan="3" Height="1" Fill="#60FFFFFF" VerticalAlignment="Bottom"/>
+                                                    <Rectangle Grid.Column="0" Grid.RowSpan="3" Width="1" Fill="#60FFFFFF" HorizontalAlignment="Right"/>
+                                                    <Rectangle Grid.Column="1" Grid.RowSpan="3" Width="1" Fill="#60FFFFFF" HorizontalAlignment="Right"/>
+                                                </Grid>
+                                            </Border>
+                                        </ControlTemplate>
+                                    </Thumb.Template>
+                                </Thumb>
+
+                                <!-- 8 Resize Handles -->
+                                <Thumb x:Name="thumbNW" Style="{StaticResource CropThumbStyle}" Cursor="SizeNWSE" DragDelta="Handle_DragDelta" Tag="NW"/>
+                                <Thumb x:Name="thumbNE" Style="{StaticResource CropThumbStyle}" Cursor="SizeNESW" DragDelta="Handle_DragDelta" Tag="NE"/>
+                                <Thumb x:Name="thumbSW" Style="{StaticResource CropThumbStyle}" Cursor="SizeNESW" DragDelta="Handle_DragDelta" Tag="SW"/>
+                                <Thumb x:Name="thumbSE" Style="{StaticResource CropThumbStyle}" Cursor="SizeNWSE" DragDelta="Handle_DragDelta" Tag="SE"/>
+
+                                <Thumb x:Name="thumbN" Style="{StaticResource CropThumbStyle}" Cursor="SizeNS" DragDelta="Handle_DragDelta" Tag="N"/>
+                                <Thumb x:Name="thumbS" Style="{StaticResource CropThumbStyle}" Cursor="SizeNS" DragDelta="Handle_DragDelta" Tag="S"/>
+                                <Thumb x:Name="thumbW" Style="{StaticResource CropThumbStyle}" Cursor="SizeWE" DragDelta="Handle_DragDelta" Tag="W"/>
+                                <Thumb x:Name="thumbE" Style="{StaticResource CropThumbStyle}" Cursor="SizeWE" DragDelta="Handle_DragDelta" Tag="E"/>
+                            </Canvas>
+                        </Grid>
+                    </Border>
+
+                    <!-- Bottom Specs Bar -->
+                    <Border Grid.Row="2" Background="{StaticResource BgInputBrush}" CornerRadius="6" Padding="12,6">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0" x:Name="txtSpecDims" Text="Resolusi: -" FontSize="11" Foreground="{StaticResource TextSecondaryBrush}" VerticalAlignment="Center"/>
+                            <TextBlock Grid.Column="1" x:Name="txtSpecSize" Text="Ukuran: -" FontSize="11" FontWeight="SemiBold" Foreground="{StaticResource TextSecondaryBrush}" HorizontalAlignment="Center" VerticalAlignment="Center" Margin="8,0" TextTrimming="CharacterEllipsis"/>
+                            <TextBlock Grid.Column="2" x:Name="txtSpecFmt" Text="Format: -" FontSize="11" Foreground="{StaticResource TextSecondaryBrush}" HorizontalAlignment="Right" VerticalAlignment="Center"/>
+                        </Grid>
+                    </Border>
+                </Grid>
+            </Border>
+
+            <!-- ── RIGHT COLUMN (COL 4): SETTINGS PANEL (SCROLLABLE & TIDY) ── -->
+            <ScrollViewer Grid.Column="4" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" BorderThickness="0">
+                <Border Background="{StaticResource BgCardBrush}" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1" CornerRadius="10" Padding="16,14">
                     <StackPanel>
-                        <TextBlock Text="Pengaturan Resize &amp; Output" FontWeight="Bold" FontSize="14" Foreground="{StaticResource TextPrimaryBrush}" Margin="0,0,0,10"/>
+                        <TextBlock Text="Pengaturan Pas Foto &amp; Output" FontWeight="Bold" FontSize="14" Foreground="{StaticResource TextPrimaryBrush}" Margin="0,0,0,10"/>
 
-                        <!-- Section A: Pas Foto Presets in 3-column UniformGrid -->
+                        <!-- ══ SECTION 1: LATAR BELAKANG PAS FOTO AI (VISUAL COLOR BUTTONS) ══ -->
+                        <Grid Margin="0,0,0,6">
+                            <TextBlock Text="Latar Belakang:" FontWeight="SemiBold" FontSize="11" Foreground="{StaticResource TextPrimaryBrush}" VerticalAlignment="Center"/>
+                            <Border Background="{StaticResource AccentBgBrush}" CornerRadius="4" Padding="6,2" HorizontalAlignment="Right">
+                                <TextBlock Text="Pasfoto ID" FontSize="10" FontWeight="SemiBold" Foreground="{StaticResource AccentBrush}"/>
+                            </Border>
+                        </Grid>
+
+                        <!-- Visual Color Buttons (UniformGrid 2 Columns for comfortable breathing room) -->
+                        <UniformGrid x:Name="pnlBgButtons" Columns="2" Margin="0,0,0,4">
+                            <!-- 1. Asli / None -->
+                            <RadioButton x:Name="rbBgNone" IsChecked="True" GroupName="BgPresets" Style="{StaticResource ColorSwatchRadioStyle}" Background="#F1F5F9" BorderBrush="#CBD5E1" Foreground="#334155" Checked="BgPreset_Checked" ToolTip="Pertahankan latar belakang asli tanpa diubah">
+                                <TextBlock Text="Asli" FontSize="11" FontWeight="SemiBold" Foreground="#334155" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                            </RadioButton>
+
+                            <!-- 2. Merah (Ganjil) -->
+                            <RadioButton x:Name="rbBgRed" GroupName="BgPresets" Style="{StaticResource ColorSwatchRadioStyle}" Background="#DC2626" BorderBrush="#B91C1C" Foreground="#FFFFFF" Checked="BgPreset_Checked" ToolTip="Pasfoto Merah standar tahun kelahiran ganjil (KTP/Ijazah/CPNS)">
+                                <TextBlock Text="Merah" FontSize="11" FontWeight="Bold" Foreground="#FFFFFF" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                            </RadioButton>
+
+                            <!-- 3. Biru (Genap) -->
+                            <RadioButton x:Name="rbBgBlue" GroupName="BgPresets" Style="{StaticResource ColorSwatchRadioStyle}" Background="#0284C7" BorderBrush="#0369A1" Foreground="#FFFFFF" Checked="BgPreset_Checked" ToolTip="Pasfoto Biru standar tahun kelahiran genap (KTP/Ijazah/CPNS)">
+                                <TextBlock Text="Biru" FontSize="11" FontWeight="Bold" Foreground="#FFFFFF" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                            </RadioButton>
+
+                            <!-- 4. Putih (Visa / Paspor) -->
+                            <RadioButton x:Name="rbBgWhite" GroupName="BgPresets" Style="{StaticResource ColorSwatchRadioStyle}" Background="#FFFFFF" BorderBrush="#94A3B8" Foreground="#0F172A" Checked="BgPreset_Checked" ToolTip="Pasfoto Putih standar dokumen visa &amp; paspor resmi">
+                                <TextBlock Text="Putih" FontSize="11" FontWeight="Bold" Foreground="#0F172A" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                            </RadioButton>
+
+                            <!-- 5. Transparan (PNG Cutout) -->
+                            <RadioButton x:Name="rbBgTransparent" GroupName="BgPresets" Style="{StaticResource ColorSwatchRadioStyle}" Background="#1E293B" BorderBrush="#334155" Foreground="#FFFFFF" Checked="BgPreset_Checked" ToolTip="Hapus latar belakang foto (otomatis diekspor dalam format PNG)">
+                                <TextBlock Text="Transparan" FontSize="11" FontWeight="Bold" Foreground="#FFFFFF" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                            </RadioButton>
+
+                            <!-- 6. Kustom Palette / Hex -->
+                            <RadioButton x:Name="rbBgCustom" GroupName="BgPresets" Style="{StaticResource ColorSwatchRadioStyle}" Background="#6366F1" BorderBrush="#4F46E5" Foreground="#FFFFFF" Checked="BgPreset_Checked" Click="RbBgCustom_Click" ToolTip="Pilih warna kustom dari palet warna (klik untuk ganti warna)">
+                                <TextBlock x:Name="txtRbBgCustom" Text="Kustom" FontSize="11" FontWeight="Bold" Foreground="#FFFFFF" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                            </RadioButton>
+                        </UniformGrid>
+
+                        <TextBlock x:Name="txtBgHint" Text="Pertahankan background asli tanpa perubahan" FontSize="11" Foreground="{StaticResource TextSecondaryBrush}" TextWrapping="Wrap" Margin="2,0,0,8"/>
+
+                        <Separator Background="{StaticResource BorderBrush}" Margin="0,4,0,8"/>
+
+                        <!-- ══ SECTION 2: UKURAN PAS FOTO ══ -->
                         <TextBlock Text="Ukuran Pas Foto:" FontWeight="SemiBold" FontSize="11" Foreground="{StaticResource TextPrimaryBrush}" Margin="0,0,0,6"/>
                         <UniformGrid x:Name="pnlPresetButtons" Columns="3" Margin="0,0,0,4">
                             <RadioButton x:Name="rbPresetOriginal" Content="Original" IsChecked="True" GroupName="Presets" Style="{StaticResource SegmentedRadioStyle}" Checked="Preset_Checked"/>
@@ -269,18 +415,20 @@
                             <RadioButton x:Name="rbPreset1x1" Content="1 : 1" GroupName="Presets" Style="{StaticResource SegmentedRadioStyle}" Checked="Preset_Checked"/>
                             <RadioButton x:Name="rbPresetCustom" Content="Kustom" GroupName="Presets" Style="{StaticResource SegmentedRadioStyle}" Checked="Preset_Checked"/>
                         </UniformGrid>
-                        <TextBlock x:Name="txtPresetHint" Text="Pertahankan rasio asli tanpa crop" FontSize="11" Foreground="{StaticResource TextSecondaryBrush}" Margin="2,0,0,8"/>
+                        <TextBlock x:Name="txtPresetHint" Text="Pertahankan rasio asli tanpa crop" FontSize="11" Foreground="{StaticResource TextSecondaryBrush}" TextWrapping="Wrap" Margin="2,0,0,8"/>
 
                         <!-- Custom Width & Height Row (Hidden by default) -->
                         <StackPanel x:Name="pnlCustomDimensions" Orientation="Horizontal" Margin="0,0,0,8" Visibility="Collapsed">
                             <TextBlock Text="Lebar (px):" FontSize="11" Foreground="{StaticResource TextSecondaryBrush}" VerticalAlignment="Center" Margin="0,0,6,0"/>
-                            <TextBox x:Name="txtCustomW" Text="600" Width="75" Height="32" Padding="4,0" TextAlignment="Center" HorizontalContentAlignment="Center" VerticalContentAlignment="Center" Margin="0,0,14,0"/>
+                            <TextBox x:Name="txtCustomW" Text="600" Width="70" Height="30" Padding="4,0" TextAlignment="Center" HorizontalContentAlignment="Center" VerticalContentAlignment="Center" Margin="0,0,12,0" TextChanged="TxtCustomDims_TextChanged"/>
                             <TextBlock Text="Tinggi (px):" FontSize="11" Foreground="{StaticResource TextSecondaryBrush}" VerticalAlignment="Center" Margin="0,0,6,0"/>
-                            <TextBox x:Name="txtCustomH" Text="800" Width="75" Height="32" Padding="4,0" TextAlignment="Center" HorizontalContentAlignment="Center" VerticalContentAlignment="Center"/>
+                            <TextBox x:Name="txtCustomH" Text="800" Width="70" Height="30" Padding="4,0" TextAlignment="Center" HorizontalContentAlignment="Center" VerticalContentAlignment="Center" TextChanged="TxtCustomDims_TextChanged"/>
                         </StackPanel>
 
-                        <!-- Section B: Max File Size -->
-                        <Grid Margin="0,4,0,4">
+                        <Separator Background="{StaticResource BorderBrush}" Margin="0,4,0,8"/>
+
+                        <!-- ══ SECTION 3: BATAS MAKSIMAL UKURAN FILE ══ -->
+                        <Grid Margin="0,0,0,4">
                             <TextBlock Text="Batas Maksimal File:" FontWeight="SemiBold" FontSize="11" Foreground="{StaticResource TextPrimaryBrush}" HorizontalAlignment="Left"/>
                             <TextBlock x:Name="txtMaxSizeDisplay" Text="1024 KB (1.0 MB)" FontWeight="SemiBold" FontSize="11" Foreground="{StaticResource AccentBrush}" HorizontalAlignment="Right"/>
                         </Grid>
@@ -300,11 +448,13 @@
                                   IsChecked="True"
                                   FontSize="11"
                                   Foreground="{StaticResource TextSecondaryBrush}"
-                                  ToolTip="Menyesuaikan resolusi foto agar ukuran file sedekat mungkin dengan batas maksimal (misal 460 - 495 KB untuk target 500 KB) dengan kualitas visual tertinggi (90 - 95%)"
-                                  Margin="0,0,0,10"/>
+                                  ToolTip="Menyesuaikan resolusi foto agar ukuran file sedekat mungkin dengan batas maksimal dengan kualitas visual tertinggi (90 - 95%)"
+                                  Margin="0,0,0,8"/>
 
-                        <!-- Section C: Format Output -->
-                        <Grid Margin="0,0,0,10">
+                        <Separator Background="{StaticResource BorderBrush}" Margin="0,4,0,8"/>
+
+                        <!-- ══ SECTION 4: FORMAT OUTPUT ══ -->
+                        <Grid Margin="0,0,0,8">
                             <TextBlock Text="Format Output:" FontWeight="SemiBold" FontSize="11" Foreground="{StaticResource TextPrimaryBrush}" VerticalAlignment="Center" HorizontalAlignment="Left"/>
                             <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
                                 <RadioButton x:Name="rbFmtJpeg" Content="JPEG" IsChecked="True" GroupName="Formats" Style="{StaticResource SegmentedRadioStyle}" Margin="0,0,6,0"/>
@@ -313,30 +463,34 @@
                             </StackPanel>
                         </Grid>
 
-                        <!-- Section D: Folder Output (Spacious Full Width Row) -->
+                        <Separator Background="{StaticResource BorderBrush}" Margin="0,4,0,8"/>
+
+                        <!-- ══ SECTION 5: FOLDER OUTPUT ══ -->
                         <Grid Margin="0,0,0,4">
                             <TextBlock Text="Folder Output:" FontWeight="SemiBold" FontSize="11" Foreground="{StaticResource TextPrimaryBrush}" HorizontalAlignment="Left"/>
-                            <CheckBox x:Name="chkOverwrite" Content="Timpa file asli (overwrite)" FontSize="11" Foreground="{StaticResource TextSecondaryBrush}" HorizontalAlignment="Right" Click="ChkOverwrite_Click"/>
+                            <CheckBox x:Name="chkOverwrite" Content="Timpa file asli" FontSize="11" Foreground="{StaticResource TextSecondaryBrush}" HorizontalAlignment="Right" Click="ChkOverwrite_Click"/>
                         </Grid>
                         <Grid Margin="0,0,0,4">
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="*"/>
                                 <ColumnDefinition Width="Auto"/>
                             </Grid.ColumnDefinitions>
-                            <TextBox Grid.Column="0" x:Name="txtOutputFolder" Height="36" VerticalContentAlignment="Center" Margin="0,0,8,0" Text="Default: folder_sumber/resized/"/>
-                            <Button Grid.Column="1" x:Name="btnBrowseOutput" Content="Browse..." Style="{StaticResource SecondaryButtonStyle}" Height="36" MinWidth="90" Padding="14,6" Click="BtnBrowseOutput_Click"/>
+                            <TextBox Grid.Column="0" x:Name="txtOutputFolder" Height="34" VerticalContentAlignment="Center" Margin="0,0,6,0" Text="Default: folder_sumber/edited/"/>
+                            <Button Grid.Column="1" x:Name="btnBrowseOutput" Content="Browse..." Style="{StaticResource SecondaryButtonStyle}" Height="34" MinWidth="80" Padding="10,4" Click="BtnBrowseOutput_Click"/>
                         </Grid>
                     </StackPanel>
                 </Border>
-            </Grid>
+            </ScrollViewer>
         </Grid>
 
         <!-- ══════════════════════════ 3. BOTTOM BAR ══════════════════════════ -->
         <Border Grid.Row="2" Background="{StaticResource BgCardBrush}" BorderBrush="{StaticResource BorderBrush}" BorderThickness="0,1,0,0">
             <Grid Margin="24,12">
                 <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="*"/>    <!-- Status & Progress -->
-                    <ColumnDefinition Width="Auto"/> <!-- Action Buttons -->
+                    <ColumnDefinition Width="*"/>
+                    <!-- Status & Progress -->
+                    <ColumnDefinition Width="Auto"/>
+                    <!-- Action Buttons -->
                 </Grid.ColumnDefinitions>
 
                 <!-- Left: Status & Progress -->
@@ -357,7 +511,7 @@
                     <Button x:Name="btnStartResize" Style="{StaticResource PrimaryButtonStyle}" Height="40" MinWidth="150" Padding="18,8" IsEnabled="False" Click="BtnStartResize_Click">
                         <StackPanel Orientation="Horizontal" VerticalAlignment="Center" HorizontalAlignment="Center">
                             <controls:LoadingSpinner x:Name="spinnerResizeBtn" Width="15" Height="15" SpinnerColor="#FFFFFF" TrackColor="#40FFFFFF" StrokeThickness="2.2" Margin="0,0,8,0" Visibility="Collapsed"/>
-                            <TextBlock x:Name="txtStartResizeBtn" Text="Mulai Resize" VerticalAlignment="Center"/>
+                            <TextBlock x:Name="txtStartResizeBtn" Text="Mulai" VerticalAlignment="Center"/>
                         </StackPanel>
                     </Button>
                 </StackPanel>

@@ -45,6 +45,34 @@ namespace ImageResizerCSharp.Core
             };
         }
 
+        public static void ApplyCenterCrop(Image image, (int Width, int Height) targetDims)
+        {
+            var (targetW, targetH) = targetDims;
+            if (targetW <= 0 || targetH <= 0 || image.Width <= 0 || image.Height <= 0) return;
+
+            double targetRatio = (double)targetW / targetH;
+            double currentRatio = (double)image.Width / image.Height;
+
+            int cropW = image.Width;
+            int cropH = image.Height;
+
+            if (currentRatio > targetRatio)
+            {
+                cropW = Math.Max(10, (int)Math.Round(image.Height * targetRatio));
+            }
+            else if (currentRatio < targetRatio)
+            {
+                cropH = Math.Max(10, (int)Math.Round(image.Width / targetRatio));
+            }
+
+            int cropX = Math.Max(0, (image.Width - cropW) / 2);
+            int cropY = Math.Max(0, (image.Height - cropH) / 2);
+            int finalW = Math.Min(cropW, image.Width - cropX);
+            int finalH = Math.Min(cropH, image.Height - cropY);
+
+            image.Mutate(x => x.Crop(new Rectangle(cropX, cropY, finalW, finalH)));
+        }
+
         public static (int Width, int Height) ReadImageDimensions(string filePath)
         {
             using var image = Image.Load(filePath);
@@ -89,19 +117,29 @@ namespace ImageResizerCSharp.Core
             string photoPresetKey = "Original",
             int customWidth = 600,
             int customHeight = 800,
-            bool maximizeQuality = true)
+            bool maximizeQuality = true,
+            PhotoBackgroundType bgType = PhotoBackgroundType.None,
+            string customBgHex = "",
+            NormalizedCropRect? customCrop = null)
         {
             var originalFileInfo = new FileInfo(inputPath);
             long originalSize = originalFileInfo.Length;
 
-            using var image = Image.Load(inputPath);
-            image.Mutate(x => x.AutoOrient());
+            // If transparent background requested, ensure format supports transparency (PNG)
+            if (bgType == PhotoBackgroundType.Transparent && outputFormat.Equals("JPEG", StringComparison.OrdinalIgnoreCase))
+            {
+                outputFormat = "PNG";
+                outputPath = Path.ChangeExtension(outputPath, ".png");
+            }
+
+            using var loadedImage = Image.Load<SixLabors.ImageSharp.PixelFormats.Rgba32>(inputPath);
+            loadedImage.Mutate(x => x.AutoOrient());
 
             var presetDims = GetPresetDimensions(photoPresetKey, customWidth, customHeight);
 
-            // If format unchanged, preset is original, and already within target size: skip with copy
+            // If format unchanged, preset is original, no custom crop, no background change, and already within target size: skip with copy
             bool isSameFormat = string.Equals(Path.GetExtension(inputPath), GetFormatExtension(outputFormat), StringComparison.OrdinalIgnoreCase);
-            if (photoPresetKey == "Original" && isSameFormat && originalSize <= maxSizeBytes)
+            if (customCrop == null && photoPresetKey == "Original" && bgType == PhotoBackgroundType.None && isSameFormat && originalSize <= maxSizeBytes)
             {
                 if (!string.Equals(inputPath, outputPath, StringComparison.OrdinalIgnoreCase))
                 {
@@ -113,74 +151,75 @@ namespace ImageResizerCSharp.Core
                     Status: "skipped",
                     OriginalSize: originalSize,
                     NewSize: originalSize,
-                    NewWidth: image.Width,
-                    NewHeight: image.Height,
+                    NewWidth: loadedImage.Width,
+                    NewHeight: loadedImage.Height,
                     OutputPath: outputPath
                 );
             }
 
-            byte[] outputBytes;
-
-            if (presetDims.HasValue)
+            // Terapkan crop manual kustom jika ada, atau gunakan preset center crop
+            if (customCrop != null)
             {
-                var (targetW, targetH) = presetDims.Value;
-                double targetRatio = (double)targetW / targetH;
-                double currentRatio = (double)image.Width / image.Height;
+                var cropRect = customCrop.ToImageSharpRect(loadedImage.Width, loadedImage.Height);
+                loadedImage.Mutate(x => x.Crop(cropRect));
+            }
+            else if (presetDims.HasValue)
+            {
+                ApplyCenterCrop(loadedImage, presetDims.Value);
+            }
 
-                int cropW = image.Width;
-                int cropH = image.Height;
-
-                if (currentRatio > targetRatio)
-                {
-                    cropW = Math.Max(10, (int)Math.Round(image.Height * targetRatio));
-                }
-                else if (currentRatio < targetRatio)
-                {
-                    cropH = Math.Max(10, (int)Math.Round(image.Width / targetRatio));
-                }
-
-                // Center crop to target aspect ratio at maximum source resolution
-                image.Mutate(x => x.Crop(new Rectangle(
-                    Math.Max(0, (image.Width - cropW) / 2),
-                    Math.Max(0, (image.Height - cropH) / 2),
-                    Math.Min(cropW, image.Width),
-                    Math.Min(cropH, image.Height)
-                )));
-
-                if (maximizeQuality)
-                {
-                    outputBytes = CompressAndScaleToTarget(image, maxSizeBytes, outputFormat, targetW);
-                }
-                else
-                {
-                    image.Mutate(x => x.Resize(targetW, targetH));
-                    outputBytes = CompressToTarget(image, maxSizeBytes, outputFormat);
-                }
+            // Ganti background jika opsi dipilih
+            SixLabors.ImageSharp.Image imageToProcess;
+            if (bgType != PhotoBackgroundType.None)
+            {
+                imageToProcess = BackgroundMattingEngine.ReplaceBackground(loadedImage, bgType, customBgHex);
             }
             else
             {
-                // Original preset
-                if (maximizeQuality && originalSize > maxSizeBytes)
+                imageToProcess = loadedImage.Clone();
+            }
+
+            byte[] outputBytes;
+            using (imageToProcess)
+            {
+                if (presetDims.HasValue)
                 {
-                    outputBytes = CompressAndScaleToTarget(image, maxSizeBytes, outputFormat, Math.Min(300, image.Width));
+                    var (targetW, targetH) = presetDims.Value;
+                    if (maximizeQuality)
+                    {
+                        outputBytes = CompressAndScaleToTarget(imageToProcess, maxSizeBytes, outputFormat, targetW);
+                    }
+                    else
+                    {
+                        imageToProcess.Mutate(x => x.Resize(targetW, targetH));
+                        outputBytes = CompressToTarget(imageToProcess, maxSizeBytes, outputFormat);
+                    }
                 }
                 else
                 {
-                    outputBytes = CompressToTarget(image, maxSizeBytes, outputFormat);
+                    // Original preset
+                    if (maximizeQuality && originalSize > maxSizeBytes)
+                    {
+                        outputBytes = CompressAndScaleToTarget(imageToProcess, maxSizeBytes, outputFormat, Math.Min(300, imageToProcess.Width));
+                    }
+                    else
+                    {
+                        outputBytes = CompressToTarget(imageToProcess, maxSizeBytes, outputFormat);
+                    }
                 }
+
+                Directory.CreateDirectory(Path.GetDirectoryName(outputPath)!);
+                File.WriteAllBytes(outputPath, outputBytes);
+
+                return new ResizeResult(
+                    Status: "done",
+                    OriginalSize: originalSize,
+                    NewSize: outputBytes.Length,
+                    NewWidth: imageToProcess.Width,
+                    NewHeight: imageToProcess.Height,
+                    OutputPath: outputPath
+                );
             }
-
-            Directory.CreateDirectory(Path.GetDirectoryName(outputPath)!);
-            File.WriteAllBytes(outputPath, outputBytes);
-
-            return new ResizeResult(
-                Status: "done",
-                OriginalSize: originalSize,
-                NewSize: outputBytes.Length,
-                NewWidth: image.Width,
-                NewHeight: image.Height,
-                OutputPath: outputPath
-            );
         }
 
         private static byte[] CompressAndScaleToTarget(
@@ -378,10 +417,18 @@ namespace ImageResizerCSharp.Core
             int customH,
             bool maximizeQuality,
             IProgress<ResizeProgressReport> progress,
+            PhotoBackgroundType bgType = PhotoBackgroundType.None,
+            string customBgHex = "",
             CancellationToken ct = default)
         {
             int total = items.Count;
             int completed = 0;
+
+            // Jika latar belakang transparan, otomatis ubah format ke PNG
+            if (bgType == PhotoBackgroundType.Transparent && outputFormat.Equals("JPEG", StringComparison.OrdinalIgnoreCase))
+            {
+                outputFormat = "PNG";
+            }
 
             var parallelOptions = new ParallelOptions
             {
@@ -395,7 +442,7 @@ namespace ImageResizerCSharp.Core
 
                 string ext = GetFormatExtension(outputFormat);
                 string outPath = overwrite
-                    ? item.FilePath
+                    ? (bgType == PhotoBackgroundType.Transparent ? Path.ChangeExtension(item.FilePath, ".png") : item.FilePath)
                     : Path.Combine(outputDirectory, Path.GetFileNameWithoutExtension(item.FilePath) + ext);
 
                 try
@@ -408,7 +455,10 @@ namespace ImageResizerCSharp.Core
                         photoPresetKey,
                         customW,
                         customH,
-                        maximizeQuality
+                        maximizeQuality,
+                        bgType,
+                        customBgHex,
+                        customCrop: item.CustomCrop
                     );
 
                     int cur = Interlocked.Increment(ref completed);

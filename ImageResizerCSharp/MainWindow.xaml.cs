@@ -8,6 +8,8 @@ using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Controls.Primitives;
+using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using Microsoft.Win32;
 using ImageResizerCSharp.Core;
@@ -23,6 +25,14 @@ namespace ImageResizerCSharp
         private string? _lastSuccessfulOutputDir;
         private bool _isProcessing = false;
         private CancellationTokenSource? _cts;
+
+        private PhotoBackgroundType _selectedBgType = PhotoBackgroundType.None;
+        private string _customBgHex = "#6366F1";
+        private ImageItem? _currentPreviewItem = null;
+        private BitmapSource? _originalPreviewBitmap = null;
+        private bool _isPreviewingAi = false;
+        private bool _isCropMode = false;
+        private double? _lockedCropRatio = null;
 
         private static readonly HashSet<string> SupportedExtensions = new(StringComparer.OrdinalIgnoreCase)
         {
@@ -60,7 +70,7 @@ namespace ImageResizerCSharp
 
             if (string.IsNullOrEmpty(_outputFolder))
             {
-                var defOutput = Path.Combine(folderPath, "resized");
+                var defOutput = Path.Combine(folderPath, "edited");
                 txtOutputFolder.Text = defOutput;
                 _outputFolder = defOutput;
             }
@@ -192,8 +202,17 @@ namespace ImageResizerCSharp
             }
         }
 
+        private BitmapSource? _lastAiPreviewBitmap = null;
+        private int _aiPreviewGeneration = 0;
+
         private void ShowPreview(ImageItem item)
         {
+            _currentPreviewItem = item;
+            _isPreviewingAi = false;
+            _lastAiPreviewBitmap = null;
+            if (badgeAiPreviewActive != null) badgeAiPreviewActive.Visibility = Visibility.Collapsed;
+            if (btnResetPreview != null) btnResetPreview.Visibility = Visibility.Collapsed;
+
             try
             {
                 var bitmap = new BitmapImage();
@@ -202,6 +221,7 @@ namespace ImageResizerCSharp
                 bitmap.CacheOption = BitmapCacheOption.OnLoad;
                 bitmap.EndInit();
 
+                _originalPreviewBitmap = bitmap;
                 imgPreview.Source = bitmap;
                 pnlPreviewEmpty.Visibility = Visibility.Collapsed;
 
@@ -211,7 +231,21 @@ namespace ImageResizerCSharp
 
                 txtSpecDims.Text = $"Resolusi: {bitmap.PixelWidth} × {bitmap.PixelHeight} px";
                 txtSpecSize.Text = $"Ukuran: {item.FormattedSize}{tag}";
+                txtSpecSize.Foreground = isOver
+                    ? (System.Windows.Media.Brush)FindResource("DangerBrush")
+                    : (System.Windows.Media.Brush)FindResource("SuccessBrush");
                 txtSpecFmt.Text = $"Format: {Path.GetExtension(item.FilePath).TrimStart('.').ToUpperInvariant()}";
+
+                // Jika latar belakang warna, preset crop, atau crop manual aktif, tampilkan preview live
+                if (_isCropMode)
+                {
+                    ShowUncroppedPreviewForCropMode();
+                    InitCropBoxPosition();
+                }
+                else if (_selectedBgType != PhotoBackgroundType.None || GetSelectedPresetKey() != "Original" || item.CustomCrop != null)
+                {
+                    TriggerAiPreviewAsync();
+                }
             }
             catch (Exception ex)
             {
@@ -221,7 +255,670 @@ namespace ImageResizerCSharp
             }
         }
 
+        private string GetSelectedPresetKey()
+        {
+            if (rbPreset2x3?.IsChecked == true) return "2x3";
+            if (rbPreset3x4?.IsChecked == true) return "3x4";
+            if (rbPreset4x6?.IsChecked == true) return "4x6";
+            if (rbPreset1x1?.IsChecked == true) return "1x1";
+            if (rbPresetCustom?.IsChecked == true) return "Custom";
+            return "Original";
+        }
+
+        private (int W, int H) GetCustomDimensions()
+        {
+            int w = (txtCustomW != null && int.TryParse(txtCustomW.Text, out int cw)) ? cw : 600;
+            int h = (txtCustomH != null && int.TryParse(txtCustomH.Text, out int ch)) ? ch : 800;
+            return (w, h);
+        }
+
+        // ─── Interactive Free Crop Mode ──────────────────────────────────────────
+
+        private void BtnToggleCropMode_Click(object sender, RoutedEventArgs e)
+        {
+            if (_currentPreviewItem == null)
+            {
+                btnToggleCropMode.IsChecked = false;
+                return;
+            }
+
+            _isCropMode = btnToggleCropMode.IsChecked == true;
+
+            if (_isCropMode)
+            {
+                btnToggleCropMode.Content = "✓ Selesai Crop";
+                pnlCropRatioOptions.Visibility = Visibility.Visible;
+                cropCanvas.Visibility = Visibility.Visible;
+
+                ShowUncroppedPreviewForCropMode();
+
+                Dispatcher.BeginInvoke(new Action(() =>
+                {
+                    InitCropBoxPosition();
+                }), System.Windows.Threading.DispatcherPriority.Loaded);
+            }
+            else
+            {
+                btnToggleCropMode.Content = "✂ Crop Bebas";
+                pnlCropRatioOptions.Visibility = Visibility.Collapsed;
+                cropCanvas.Visibility = Visibility.Collapsed;
+
+                TriggerAiPreviewAsync();
+            }
+        }
+
+        private async void ShowUncroppedPreviewForCropMode()
+        {
+            if (_currentPreviewItem == null) return;
+            string filePath = _currentPreviewItem.FilePath;
+            var bgToPreview = _selectedBgType;
+            string hex = _customBgHex;
+
+            if (bgToPreview == PhotoBackgroundType.None)
+            {
+                if (_originalPreviewBitmap != null)
+                {
+                    imgPreview.Source = _originalPreviewBitmap;
+                }
+            }
+            else
+            {
+                try
+                {
+                    var previewBitmap = await Task.Run(() =>
+                    {
+                        return BackgroundMattingEngine.GeneratePreviewBitmap(
+                            filePath,
+                            bgToPreview,
+                            hex,
+                            720,
+                            "Original",
+                            600,
+                            800,
+                            null
+                        );
+                    });
+
+                    if (_isCropMode && _currentPreviewItem?.FilePath == filePath)
+                    {
+                        imgPreview.Source = previewBitmap;
+                    }
+                }
+                catch { }
+            }
+        }
+
+        private void CropRatio_Checked(object sender, RoutedEventArgs e)
+        {
+            if (rbCropRatio2x3?.IsChecked == true) _lockedCropRatio = 2.0 / 3.0;
+            else if (rbCropRatio3x4?.IsChecked == true) _lockedCropRatio = 3.0 / 4.0;
+            else if (rbCropRatio4x6?.IsChecked == true) _lockedCropRatio = 4.0 / 6.0;
+            else if (rbCropRatio1x1?.IsChecked == true) _lockedCropRatio = 1.0;
+            else _lockedCropRatio = null; // Free
+
+            if (_isCropMode && _currentPreviewItem != null)
+            {
+                AdjustCropBoxToLockedRatio();
+            }
+        }
+
+        private void BtnResetCrop_Click(object sender, RoutedEventArgs e)
+        {
+            if (_currentPreviewItem == null) return;
+            _currentPreviewItem.CustomCrop = null;
+
+            if (_isCropMode)
+            {
+                InitCropBoxPosition();
+            }
+            else
+            {
+                TriggerAiPreviewAsync();
+            }
+        }
+
+        private void GridPreviewContainer_SizeChanged(object sender, SizeChangedEventArgs e)
+        {
+            if (_isCropMode && _currentPreviewItem != null)
+            {
+                Dispatcher.BeginInvoke(new Action(() =>
+                {
+                    UpdateCropBoxFromNormalizedRect();
+                }), System.Windows.Threading.DispatcherPriority.Render);
+            }
+        }
+
+        private Rect GetRenderedImageRect()
+        {
+            if (imgPreview.Source == null || imgPreview.ActualWidth <= 0 || imgPreview.ActualHeight <= 0)
+                return Rect.Empty;
+
+            double srcW = imgPreview.Source.Width;
+            double srcH = imgPreview.Source.Height;
+            if (srcW <= 0 || srcH <= 0) return Rect.Empty;
+
+            double availW = imgPreview.ActualWidth;
+            double availH = imgPreview.ActualHeight;
+
+            double srcRatio = srcW / srcH;
+            double availRatio = availW / availH;
+
+            double renderW, renderH;
+            if (srcRatio > availRatio)
+            {
+                renderW = availW;
+                renderH = availW / srcRatio;
+            }
+            else
+            {
+                renderH = availH;
+                renderW = availH * srcRatio;
+            }
+
+            Point imgPos = imgPreview.TranslatePoint(new Point(0, 0), cropCanvas);
+            double renderX = imgPos.X + (availW - renderW) / 2.0;
+            double renderY = imgPos.Y + (availH - renderH) / 2.0;
+
+            return new Rect(renderX, renderY, renderW, renderH);
+        }
+
+        private void InitCropBoxPosition()
+        {
+            var renderRect = GetRenderedImageRect();
+            if (renderRect.IsEmpty || renderRect.Width < 20 || renderRect.Height < 20) return;
+
+            if (_currentPreviewItem?.CustomCrop != null)
+            {
+                UpdateCropBoxFromNormalizedRect();
+            }
+            else
+            {
+                double w = renderRect.Width * 0.8;
+                double h = renderRect.Height * 0.8;
+
+                if (_lockedCropRatio.HasValue)
+                {
+                    double ratio = _lockedCropRatio.Value;
+                    if (w / h > ratio)
+                    {
+                        w = h * ratio;
+                    }
+                    else
+                    {
+                        h = w / ratio;
+                    }
+                }
+
+                double x = renderRect.X + (renderRect.Width - w) / 2.0;
+                double y = renderRect.Y + (renderRect.Height - h) / 2.0;
+
+                SetCropBoxRect(new Rect(x, y, w, h));
+            }
+        }
+
+        private void AdjustCropBoxToLockedRatio()
+        {
+            if (!_lockedCropRatio.HasValue) return;
+
+            var renderRect = GetRenderedImageRect();
+            if (renderRect.IsEmpty) return;
+
+            double curX = Canvas.GetLeft(cropBoxThumb);
+            double curY = Canvas.GetTop(cropBoxThumb);
+            double curW = cropBoxThumb.Width;
+            double curH = cropBoxThumb.Height;
+
+            if (double.IsNaN(curX) || curW <= 0) return;
+
+            double ratio = _lockedCropRatio.Value;
+            double newW = curW;
+            double newH = newW / ratio;
+
+            if (curY + newH > renderRect.Bottom)
+            {
+                newH = renderRect.Bottom - curY;
+                newW = newH * ratio;
+            }
+
+            if (curX + newW > renderRect.Right)
+            {
+                newW = renderRect.Right - curX;
+                newH = newW / ratio;
+            }
+
+            SetCropBoxRect(new Rect(curX, curY, newW, newH));
+        }
+
+        private void UpdateCropBoxFromNormalizedRect()
+        {
+            var renderRect = GetRenderedImageRect();
+            if (renderRect.IsEmpty) return;
+
+            var norm = _currentPreviewItem?.CustomCrop;
+            if (norm != null)
+            {
+                double x = renderRect.X + norm.X * renderRect.Width;
+                double y = renderRect.Y + norm.Y * renderRect.Height;
+                double w = norm.Width * renderRect.Width;
+                double h = norm.Height * renderRect.Height;
+                SetCropBoxRect(new Rect(x, y, w, h), saveToModel: false);
+            }
+        }
+
+        private void SetCropBoxRect(Rect r, bool saveToModel = true)
+        {
+            var renderRect = GetRenderedImageRect();
+            if (renderRect.IsEmpty) return;
+
+            double x = Math.Clamp(r.X, renderRect.X, Math.Max(renderRect.X, renderRect.Right - 20));
+            double y = Math.Clamp(r.Y, renderRect.Y, Math.Max(renderRect.Y, renderRect.Bottom - 20));
+            double w = Math.Clamp(r.Width, 20, Math.Max(20, renderRect.Right - x));
+            double h = Math.Clamp(r.Height, 20, Math.Max(20, renderRect.Bottom - y));
+
+            Canvas.SetLeft(cropBoxThumb, x);
+            Canvas.SetTop(cropBoxThumb, y);
+            cropBoxThumb.Width = w;
+            cropBoxThumb.Height = h;
+
+            double hw = 5;
+            double hh = 5;
+
+            Canvas.SetLeft(thumbNW, x - hw);
+            Canvas.SetTop(thumbNW, y - hh);
+
+            Canvas.SetLeft(thumbNE, x + w - hw);
+            Canvas.SetTop(thumbNE, y - hh);
+
+            Canvas.SetLeft(thumbSW, x - hw);
+            Canvas.SetTop(thumbSW, y + h - hh);
+
+            Canvas.SetLeft(thumbSE, x + w - hw);
+            Canvas.SetTop(thumbSE, y + h - hh);
+
+            Canvas.SetLeft(thumbN, x + w / 2.0 - hw);
+            Canvas.SetTop(thumbN, y - hh);
+
+            Canvas.SetLeft(thumbS, x + w / 2.0 - hw);
+            Canvas.SetTop(thumbS, y + h - hh);
+
+            Canvas.SetLeft(thumbW, x - hw);
+            Canvas.SetTop(thumbW, y + h / 2.0 - hh);
+
+            Canvas.SetLeft(thumbE, x + w - hw);
+            Canvas.SetTop(thumbE, y + h / 2.0 - hh);
+
+            if (cropCanvas.ActualWidth > 0 && cropCanvas.ActualHeight > 0)
+            {
+                var outer = new RectangleGeometry(new Rect(0, 0, cropCanvas.ActualWidth, cropCanvas.ActualHeight));
+                var inner = new RectangleGeometry(new Rect(x, y, w, h));
+                cropMaskPath.Data = new CombinedGeometry(GeometryCombineMode.Exclude, outer, inner);
+            }
+
+            if (saveToModel && _currentPreviewItem != null && renderRect.Width > 0 && renderRect.Height > 0)
+            {
+                double nx = (x - renderRect.X) / renderRect.Width;
+                double ny = (y - renderRect.Y) / renderRect.Height;
+                double nw = w / renderRect.Width;
+                double nh = h / renderRect.Height;
+
+                _currentPreviewItem.CustomCrop = new NormalizedCropRect(nx, ny, nw, nh);
+
+                if (_originalPreviewBitmap != null)
+                {
+                    int pxW = (int)Math.Round(nw * _originalPreviewBitmap.PixelWidth);
+                    int pxH = (int)Math.Round(nh * _originalPreviewBitmap.PixelHeight);
+                    txtSpecDims.Text = $"Crop Aktif: {pxW} × {pxH} px";
+                }
+            }
+        }
+
+        private void CropBoxThumb_DragDelta(object sender, DragDeltaEventArgs e)
+        {
+            var renderRect = GetRenderedImageRect();
+            if (renderRect.IsEmpty) return;
+
+            double curX = Canvas.GetLeft(cropBoxThumb);
+            double curY = Canvas.GetTop(cropBoxThumb);
+            double w = cropBoxThumb.Width;
+            double h = cropBoxThumb.Height;
+
+            double newX = curX + e.HorizontalChange;
+            double newY = curY + e.VerticalChange;
+
+            newX = Math.Clamp(newX, renderRect.X, Math.Max(renderRect.X, renderRect.Right - w));
+            newY = Math.Clamp(newY, renderRect.Y, Math.Max(renderRect.Y, renderRect.Bottom - h));
+
+            SetCropBoxRect(new Rect(newX, newY, w, h));
+        }
+
+        private void Handle_DragDelta(object sender, DragDeltaEventArgs e)
+        {
+            if (sender is not Thumb thumb || thumb.Tag is not string tag) return;
+            var renderRect = GetRenderedImageRect();
+            if (renderRect.IsEmpty) return;
+
+            double x = Canvas.GetLeft(cropBoxThumb);
+            double y = Canvas.GetTop(cropBoxThumb);
+            double w = cropBoxThumb.Width;
+            double h = cropBoxThumb.Height;
+
+            double dx = e.HorizontalChange;
+            double dy = e.VerticalChange;
+
+            switch (tag)
+            {
+                case "SE":
+                    w += dx;
+                    h = _lockedCropRatio.HasValue ? w / _lockedCropRatio.Value : h + dy;
+                    break;
+                case "SW":
+                    x += dx;
+                    w -= dx;
+                    h = _lockedCropRatio.HasValue ? w / _lockedCropRatio.Value : h + dy;
+                    break;
+                case "NE":
+                    w += dx;
+                    if (_lockedCropRatio.HasValue)
+                    {
+                        double oldH = h;
+                        h = w / _lockedCropRatio.Value;
+                        y -= (h - oldH);
+                    }
+                    else
+                    {
+                        y += dy;
+                        h -= dy;
+                    }
+                    break;
+                case "NW":
+                    x += dx;
+                    w -= dx;
+                    if (_lockedCropRatio.HasValue)
+                    {
+                        double oldH = h;
+                        h = w / _lockedCropRatio.Value;
+                        y -= (h - oldH);
+                    }
+                    else
+                    {
+                        y += dy;
+                        h -= dy;
+                    }
+                    break;
+                case "E":
+                    w += dx;
+                    if (_lockedCropRatio.HasValue) h = w / _lockedCropRatio.Value;
+                    break;
+                case "W":
+                    x += dx;
+                    w -= dx;
+                    if (_lockedCropRatio.HasValue) h = w / _lockedCropRatio.Value;
+                    break;
+                case "S":
+                    h += dy;
+                    if (_lockedCropRatio.HasValue) w = h * _lockedCropRatio.Value;
+                    break;
+                case "N":
+                    y += dy;
+                    h -= dy;
+                    if (_lockedCropRatio.HasValue) w = h * _lockedCropRatio.Value;
+                    break;
+            }
+
+            SetCropBoxRect(new Rect(x, y, w, h));
+        }
+
+        private async void TriggerAiPreviewAsync()
+        {
+            if (_currentPreviewItem == null) return;
+
+            string preset = GetSelectedPresetKey();
+            var (customW, customH) = GetCustomDimensions();
+            var customCrop = _currentPreviewItem.CustomCrop;
+
+            // Jika preset Original, tidak ada crop manual, dan Background None: kembalikan ke foto asli
+            if (_selectedBgType == PhotoBackgroundType.None && preset == "Original" && customCrop == null)
+            {
+                if (_originalPreviewBitmap != null)
+                {
+                    imgPreview.Source = _originalPreviewBitmap;
+                    _isPreviewingAi = false;
+                    if (badgeAiPreviewActive != null) badgeAiPreviewActive.Visibility = Visibility.Collapsed;
+                    if (btnResetPreview != null) btnResetPreview.Visibility = Visibility.Collapsed;
+
+                    txtSpecDims.Text = $"Resolusi: {_originalPreviewBitmap.PixelWidth} × {_originalPreviewBitmap.PixelHeight} px";
+                }
+                return;
+            }
+
+            string filePath = _currentPreviewItem.FilePath;
+            var bgToPreview = _selectedBgType;
+            string hex = _customBgHex;
+
+            int currentGen = Interlocked.Increment(ref _aiPreviewGeneration);
+            if (pnlAiLoading != null && bgToPreview != PhotoBackgroundType.None)
+            {
+                pnlAiLoading.Visibility = Visibility.Visible;
+            }
+
+            try
+            {
+                var previewBitmap = await Task.Run(() =>
+                {
+                    return BackgroundMattingEngine.GeneratePreviewBitmap(
+                        filePath,
+                        bgToPreview,
+                        hex,
+                        720,
+                        preset,
+                        customW,
+                        customH,
+                        customCrop
+                    );
+                });
+
+                if (currentGen == _aiPreviewGeneration && _currentPreviewItem?.FilePath == filePath)
+                {
+                    _lastAiPreviewBitmap = previewBitmap;
+                    imgPreview.Source = previewBitmap;
+                    _isPreviewingAi = (bgToPreview != PhotoBackgroundType.None);
+
+                    if (badgeAiPreviewActive != null)
+                    {
+                        badgeAiPreviewActive.Visibility = _isPreviewingAi ? Visibility.Visible : Visibility.Collapsed;
+                    }
+
+                    if (btnResetPreview != null)
+                    {
+                        if (bgToPreview != PhotoBackgroundType.None)
+                        {
+                            btnResetPreview.Visibility = Visibility.Visible;
+                            btnResetPreview.Content = "Bandingkan Asli";
+                        }
+                        else
+                        {
+                            btnResetPreview.Visibility = Visibility.Collapsed;
+                        }
+                    }
+
+                    if (customCrop != null && _originalPreviewBitmap != null)
+                    {
+                        int cw = (int)Math.Round(customCrop.Width * _originalPreviewBitmap.PixelWidth);
+                        int ch = (int)Math.Round(customCrop.Height * _originalPreviewBitmap.PixelHeight);
+                        txtSpecDims.Text = $"Crop Bebas: {cw} × {ch} px";
+                    }
+                    else
+                    {
+                        var presetDims = ImageResizerEngine.GetPresetDimensions(preset, customW, customH);
+                        if (presetDims.HasValue)
+                        {
+                            txtSpecDims.Text = $"Preview Crop: {presetDims.Value.Width} × {presetDims.Value.Height} px ({preset})";
+                        }
+                        else if (_originalPreviewBitmap != null)
+                        {
+                            txtSpecDims.Text = $"Resolusi: {_originalPreviewBitmap.PixelWidth} × {_originalPreviewBitmap.PixelHeight} px";
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                txtBottomStatus.Text = $"Catatan preview: {ex.Message}";
+            }
+            finally
+            {
+                if (currentGen == _aiPreviewGeneration && pnlAiLoading != null)
+                {
+                    pnlAiLoading.Visibility = Visibility.Collapsed;
+                }
+            }
+        }
+
+        private async void BtnResetPreview_Click(object sender, RoutedEventArgs e)
+        {
+            if (_currentPreviewItem == null) return;
+
+            string preset = GetSelectedPresetKey();
+            var (customW, customH) = GetCustomDimensions();
+            string filePath = _currentPreviewItem.FilePath;
+            var customCrop = _currentPreviewItem.CustomCrop;
+
+            if (_isPreviewingAi)
+            {
+                var origCropped = await Task.Run(() =>
+                {
+                    return BackgroundMattingEngine.GeneratePreviewBitmap(
+                        filePath,
+                        PhotoBackgroundType.None,
+                        "",
+                        720,
+                        preset,
+                        customW,
+                        customH,
+                        customCrop
+                    );
+                });
+
+                imgPreview.Source = origCropped;
+                _isPreviewingAi = false;
+                if (badgeAiPreviewActive != null) badgeAiPreviewActive.Visibility = Visibility.Collapsed;
+                btnResetPreview.Content = "Lihat AI";
+            }
+            else if (_lastAiPreviewBitmap != null)
+            {
+                imgPreview.Source = _lastAiPreviewBitmap;
+                _isPreviewingAi = true;
+                if (badgeAiPreviewActive != null) badgeAiPreviewActive.Visibility = Visibility.Visible;
+                btnResetPreview.Content = "Bandingkan Asli";
+            }
+        }
+
         // ─── 3. Settings & Presets ───────────────────────────────────────────────
+
+        private void BgPreset_Checked(object sender, RoutedEventArgs e)
+        {
+            if (txtBgHint == null) return;
+
+            if (rbBgNone.IsChecked == true)
+            {
+                _selectedBgType = PhotoBackgroundType.None;
+                txtBgHint.Text = "Pertahankan background asli tanpa perubahan";
+            }
+            else if (rbBgRed.IsChecked == true)
+            {
+                _selectedBgType = PhotoBackgroundType.Red;
+                txtBgHint.Text = "Merah Pasfoto (#D81B1B) • Standar tahun kelahiran GANJIL (KTP/Ijazah)";
+            }
+            else if (rbBgBlue.IsChecked == true)
+            {
+                _selectedBgType = PhotoBackgroundType.Blue;
+                txtBgHint.Text = "Biru Pasfoto (#0066CC) • Standar tahun kelahiran GENAP (KTP/Ijazah)";
+            }
+            else if (rbBgWhite.IsChecked == true)
+            {
+                _selectedBgType = PhotoBackgroundType.White;
+                txtBgHint.Text = "Putih Formal (#FFFFFF) • Standar Visa, Paspor & Dokumen Resmi";
+            }
+            else if (rbBgTransparent.IsChecked == true)
+            {
+                _selectedBgType = PhotoBackgroundType.Transparent;
+                txtBgHint.Text = "Transparan • Menghapus latar belakang (otomatis simpan format PNG)";
+                if (rbFmtPng != null) rbFmtPng.IsChecked = true;
+            }
+            else if (rbBgCustom.IsChecked == true)
+            {
+                _selectedBgType = PhotoBackgroundType.Custom;
+                UpdateCustomColorUi();
+            }
+
+            // Jika bukan Kustom, langsung jalankan atau perbarui preview AI.
+            // Untuk Kustom, RbBgCustom_Click akan membuka dialog ColorPickerWindow lalu men-trigger preview.
+            if (rbBgCustom?.IsChecked != true)
+            {
+                TriggerAiPreviewAsync();
+            }
+        }
+
+        private void RbBgCustom_Click(object sender, RoutedEventArgs e)
+        {
+            OpenColorPickerDialog();
+        }
+
+        private void OpenColorPickerDialog()
+        {
+            _selectedBgType = PhotoBackgroundType.Custom;
+            if (rbBgCustom != null && rbBgCustom.IsChecked != true)
+            {
+                rbBgCustom.IsChecked = true;
+            }
+
+            var picker = new ColorPickerWindow(_customBgHex)
+            {
+                Owner = this
+            };
+
+            if (picker.ShowDialog() == true)
+            {
+                _customBgHex = picker.SelectedHexColor;
+            }
+
+            UpdateCustomColorUi();
+            TriggerAiPreviewAsync();
+        }
+
+        private void UpdateCustomColorUi()
+        {
+            try
+            {
+                var brush = (System.Windows.Media.Brush?)new System.Windows.Media.BrushConverter().ConvertFromString(_customBgHex);
+                if (brush != null && rbBgCustom != null)
+                {
+                    rbBgCustom.Background = brush;
+                }
+
+                // Jamin kontras keterbacaan teks tombol sesuai standar WCAG AA
+                if (txtRbBgCustom != null && !string.IsNullOrEmpty(_customBgHex))
+                {
+                    string cleanHex = _customBgHex.TrimStart('#');
+                    if (cleanHex.Length == 6)
+                    {
+                        byte r = Convert.ToByte(cleanHex.Substring(0, 2), 16);
+                        byte g = Convert.ToByte(cleanHex.Substring(2, 2), 16);
+                        byte b = Convert.ToByte(cleanHex.Substring(4, 2), 16);
+                        double luminance = 0.299 * r + 0.587 * g + 0.114 * b;
+                        txtRbBgCustom.Foreground = luminance > 140
+                            ? new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(15, 23, 42))
+                            : System.Windows.Media.Brushes.White;
+                    }
+                }
+            }
+            catch { }
+
+            if (txtBgHint != null)
+            {
+                txtBgHint.Text = $"Warna Kustom ({_customBgHex}) • Klik untuk ganti warna";
+            }
+        }
 
         private void Preset_Checked(object sender, RoutedEventArgs e)
         {
@@ -257,6 +954,17 @@ namespace ImageResizerCSharp
                 txtPresetHint.Text = "Tentukan resolusi kustom (px)";
                 pnlCustomDimensions.Visibility = Visibility.Visible;
             }
+
+            // Live update preview kanvas seketika saat ukuran/crop pasfoto diubah
+            TriggerAiPreviewAsync();
+        }
+
+        private void TxtCustomDims_TextChanged(object sender, TextChangedEventArgs e)
+        {
+            if (rbPresetCustom?.IsChecked == true && _currentPreviewItem != null)
+            {
+                TriggerAiPreviewAsync();
+            }
         }
 
         private void SliderMaxSize_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
@@ -288,6 +996,9 @@ namespace ImageResizerCSharp
                 bool isOver = selected.FileSize > (kb * 1024L);
                 string tag = isOver ? " (Di atas batas)" : " (Sesuai batas)";
                 txtSpecSize.Text = $"Ukuran: {selected.FormattedSize}{tag}";
+                txtSpecSize.Foreground = isOver
+                    ? (System.Windows.Media.Brush)FindResource("DangerBrush")
+                    : (System.Windows.Media.Brush)FindResource("SuccessBrush");
             }
         }
 
@@ -344,21 +1055,14 @@ namespace ImageResizerCSharp
             string outputDir = overwrite ? _sourceFolder : txtOutputFolder.Text.Trim();
             if (string.IsNullOrEmpty(outputDir))
             {
-                outputDir = Path.Combine(_sourceFolder, "resized");
+                outputDir = Path.Combine(_sourceFolder, "edited");
             }
 
             long maxBytes = (long)sliderMaxSize.Value * 1024L;
             string format = rbFmtPng.IsChecked == true ? "PNG" : (rbFmtWebp.IsChecked == true ? "WEBP" : "JPEG");
 
-            string preset = "Original";
-            if (rbPreset2x3.IsChecked == true) preset = "2x3";
-            else if (rbPreset3x4.IsChecked == true) preset = "3x4";
-            else if (rbPreset4x6.IsChecked == true) preset = "4x6";
-            else if (rbPreset1x1.IsChecked == true) preset = "1x1";
-            else if (rbPresetCustom.IsChecked == true) preset = "Custom";
-
-            int customW = int.TryParse(txtCustomW.Text, out int w) ? w : 600;
-            int customH = int.TryParse(txtCustomH.Text, out int h) ? h : 800;
+            string preset = GetSelectedPresetKey();
+            var (customW, customH) = GetCustomDimensions();
             bool maximizeQuality = chkMaximizeQuality.IsChecked == true;
 
             // Lock UI
@@ -423,6 +1127,8 @@ namespace ImageResizerCSharp
                     customH,
                     maximizeQuality,
                     progress,
+                    _selectedBgType,
+                    _customBgHex,
                     _cts.Token
                 );
 
@@ -450,6 +1156,7 @@ namespace ImageResizerCSharp
             btnBrowseSource.IsEnabled = enabled;
             btnToggleSelectAll.IsEnabled = enabled;
             btnStartResize.IsEnabled = enabled;
+            pnlBgButtons.IsEnabled = enabled;
             pnlPresetButtons.IsEnabled = enabled;
             sliderMaxSize.IsEnabled = enabled;
             chkMaximizeQuality.IsEnabled = enabled;

@@ -157,7 +157,89 @@ namespace ImageResizerCSharp.Tests
                 {
                     throw new Exception($"Batch processing count mismatch: Expected 2 files, found {generatedFiles.Length}");
                 }
-                Console.WriteLine($"[PASS] Parallel batch processing completed: {generatedFiles.Length} files generated in output directory.");
+                // 7. Test AI MODNet Pasfoto Indonesia Matting & Initialization
+                if (!BackgroundMattingEngine.IsModelAvailable())
+                {
+                    throw new FileNotFoundException($"MODNet model file not found at: {BackgroundMattingEngine.GetModelPath()}");
+                }
+                Console.WriteLine($"[PASS] MODNet fine-tuned model located: {BackgroundMattingEngine.GetModelPath()}");
+
+                using (var sampleImage = Image.Load<Rgba32>(img1))
+                {
+                    using var alphaMatte = BackgroundMattingEngine.GenerateAlphaMatte(sampleImage);
+                    if (alphaMatte.Width != sampleImage.Width || alphaMatte.Height != sampleImage.Height)
+                    {
+                        throw new Exception($"Alpha matte dimension mismatch: Expected {sampleImage.Width}x{sampleImage.Height}, got {alphaMatte.Width}x{alphaMatte.Height}");
+                    }
+                    Console.WriteLine($"[PASS] Alpha matte generated successfully: {alphaMatte.Width}x{alphaMatte.Height} px");
+
+                    // 8. Test Background Color Replacement (Red Ganjil, Blue Genap, Transparent)
+                    using var redComposite = BackgroundMattingEngine.ReplaceBackground(sampleImage, PhotoBackgroundType.Red);
+                    if (redComposite.Width != sampleImage.Width || redComposite.Height != sampleImage.Height)
+                    {
+                        throw new Exception("Red background composite dimension mismatch.");
+                    }
+                    Console.WriteLine("[PASS] Pasfoto Red background (#D81B1B) replacement verified.");
+
+                    using var blueComposite = BackgroundMattingEngine.ReplaceBackground(sampleImage, PhotoBackgroundType.Blue);
+                    if (blueComposite.Width != sampleImage.Width || blueComposite.Height != sampleImage.Height)
+                    {
+                        throw new Exception("Blue background composite dimension mismatch.");
+                    }
+                    Console.WriteLine("[PASS] Pasfoto Blue background (#0066CC) replacement verified.");
+
+                    using var transparentComposite = BackgroundMattingEngine.ReplaceBackground(sampleImage, PhotoBackgroundType.Transparent);
+                    if (transparentComposite.Width != sampleImage.Width || transparentComposite.Height != sampleImage.Height)
+                    {
+                        throw new Exception("Transparent composite dimension mismatch.");
+                    }
+                    Console.WriteLine("[PASS] Transparent background cutout verified.");
+                }
+
+                // 9. Test End-to-End Pas Foto 3x4 with Red Background Replacement & Compression
+                string outPasfotoRed = Path.Combine(tempDir, "pasfoto_3x4_red.jpg");
+                var e2eResult = ImageResizerEngine.ResizeImageToTarget(
+                    img1,
+                    outPasfotoRed,
+                    maxSizeBytes: 300 * 1024,
+                    outputFormat: "JPEG",
+                    photoPresetKey: "3x4",
+                    maximizeQuality: true,
+                    bgType: PhotoBackgroundType.Red
+                );
+
+                if (e2eResult.NewWidth <= 0 || e2eResult.NewHeight <= 0)
+                {
+                    throw new Exception("End-to-end resize with AI background returned invalid dimensions.");
+                }
+                if (e2eResult.NewSize > 300 * 1024)
+                {
+                    throw new Exception($"End-to-end result exceeded target size: {e2eResult.NewSize} > 307200");
+                }
+                Console.WriteLine($"[PASS] End-to-end Pasfoto 3x4 + Red Background + Target Size: {e2eResult.NewWidth}x{e2eResult.NewHeight}, {e2eResult.NewSize} B");
+
+                // 10. Test Interactive Free Crop (NormalizedCropRect)
+                var cropRect = new NormalizedCropRect(0.1, 0.2, 0.5, 0.6);
+                var isRect = cropRect.ToImageSharpRect(1600, 1200);
+                if (isRect.X != 160 || isRect.Y != 240 || isRect.Width != 800 || isRect.Height != 720)
+                {
+                    throw new Exception($"NormalizedCropRect mapping mismatch: Expected (160, 240, 800, 720), got ({isRect.X}, {isRect.Y}, {isRect.Width}, {isRect.Height})");
+                }
+
+                string outCrop = Path.Combine(tempDir, "cropped_custom.jpg");
+                var cropResult = ImageResizerEngine.ResizeImageToTarget(
+                    img1,
+                    outCrop,
+                    maxSizeBytes: 200 * 1024,
+                    outputFormat: "JPEG",
+                    photoPresetKey: "Original",
+                    customCrop: cropRect
+                );
+                if (cropResult.NewWidth != 800 || cropResult.NewHeight != 720)
+                {
+                    throw new Exception($"Cropped output dimension mismatch: Expected 800x720, got {cropResult.NewWidth}x{cropResult.NewHeight}");
+                }
+                Console.WriteLine($"[PASS] Free Crop test verified: {cropResult.NewWidth}x{cropResult.NewHeight} px from 1600x1200 source.");
 
                 Console.WriteLine("=== All C# ImageResizer Verification Tests PASSED! ===");
                 return true;
