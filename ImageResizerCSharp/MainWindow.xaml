@@ -27,7 +27,7 @@
                     <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                         <TextBlock Text="Bulk Image Editor" FontSize="18" FontWeight="Bold" Foreground="{StaticResource TextPrimaryBrush}" VerticalAlignment="Center"/>
                     </StackPanel>
-                    <TextBlock Text="Kompresi ukuran file dan resize pas foto (2x3, 3x4, 4x6) secara instan" FontSize="11" Foreground="{StaticResource TextSecondaryBrush}" Margin="0,2,0,0"/>
+                    <TextBlock Text="Kompresi ukuran file, resize, dan ganti warna background pas foto secara instan" FontSize="11" Foreground="{StaticResource TextSecondaryBrush}" Margin="0,2,0,0"/>
                 </StackPanel>
             </Grid>
         </Border>
@@ -122,6 +122,16 @@
                                   VirtualizingStackPanel.IsVirtualizing="True"
                                   VirtualizingStackPanel.VirtualizationMode="Recycling"
                                   Visibility="Collapsed">
+                            <ListView.ContextMenu>
+                                <ContextMenu Background="{StaticResource BgCardBrush}" BorderBrush="{StaticResource BorderBrush}">
+                                    <MenuItem Header="Putar Kiri 90° (↺)" Click="MenuItemRotateLeft_Click" Foreground="{StaticResource TextPrimaryBrush}"/>
+                                    <MenuItem Header="Putar Kanan 90° (↻)" Click="MenuItemRotateRight_Click" Foreground="{StaticResource TextPrimaryBrush}"/>
+                                    <MenuItem Header="Putar 180°" Click="MenuItemRotate180_Click" Foreground="{StaticResource TextPrimaryBrush}"/>
+                                    <Separator Background="{StaticResource BorderBrush}"/>
+                                    <MenuItem Header="Terapkan Putaran ke Semua Foto" Click="MenuItemRotateAll_Click" Foreground="{StaticResource TextPrimaryBrush}"/>
+                                    <MenuItem Header="Reset Putaran (0°)" Click="MenuItemResetRotation_Click" Foreground="{StaticResource TextPrimaryBrush}"/>
+                                </ContextMenu>
+                            </ListView.ContextMenu>
                             <ListView.ItemContainerStyle>
                                 <Style TargetType="ListViewItem">
                                     <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
@@ -233,31 +243,28 @@
                 <Grid>
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto"/>
-                        <!-- Header & AI Action Bar -->
-                        <RowDefinition Height="*"/>
-                        <!-- Big Image Canvas -->
+                        <!-- Row 0: Header & AI Action Bar -->
                         <RowDefinition Height="Auto"/>
-                        <!-- Metadata Specs Bar -->
+                        <!-- Row 1: Dedicated Crop Sub-bar (Hanya muncul saat Crop Aktif) -->
+                        <RowDefinition Height="*"/>
+                        <!-- Row 2: Big Image Canvas -->
+                        <RowDefinition Height="Auto"/>
+                        <!-- Row 3: Metadata Specs Bar -->
                     </Grid.RowDefinitions>
 
-                    <!-- Header & AI Action Bar -->
+                    <!-- Row 0: Header & AI Action Bar -->
                     <Grid Grid.Row="0" Margin="0,0,0,8">
                         <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                             <TextBlock Text="Preview Foto" FontWeight="Bold" FontSize="14" Foreground="{StaticResource TextPrimaryBrush}" VerticalAlignment="Center"/>
 
-                            <!-- Toggle Crop Mode Button -->
-                            <ToggleButton x:Name="btnToggleCropMode" Content="✂ Crop Bebas" Style="{StaticResource CropToggleButtonStyle}" Margin="10,0,0,0" Click="BtnToggleCropMode_Click" ToolTip="Aktifkan kotak pemotongan bebas interaktif di kanvas"/>
-
-                            <!-- Ratio Selector when Crop Mode is Active -->
-                            <StackPanel x:Name="pnlCropRatioOptions" Orientation="Horizontal" Margin="6,0,0,0" VerticalAlignment="Center" Visibility="Collapsed">
-                                <RadioButton x:Name="rbCropRatioFree" Content="Bebas" GroupName="CropRatio" IsChecked="True" Style="{StaticResource SegmentedRadioStyle}" FontSize="10" Padding="6,3" Margin="2,0" Checked="CropRatio_Checked"/>
-                                <RadioButton x:Name="rbCropRatio2x3" Content="2:3" GroupName="CropRatio" Style="{StaticResource SegmentedRadioStyle}" FontSize="10" Padding="6,3" Margin="2,0" Checked="CropRatio_Checked"/>
-                                <RadioButton x:Name="rbCropRatio3x4" Content="3:4" GroupName="CropRatio" Style="{StaticResource SegmentedRadioStyle}" FontSize="10" Padding="6,3" Margin="2,0" Checked="CropRatio_Checked"/>
-                                <RadioButton x:Name="rbCropRatio4x6" Content="4:6" GroupName="CropRatio" Style="{StaticResource SegmentedRadioStyle}" FontSize="10" Padding="6,3" Margin="2,0" Checked="CropRatio_Checked"/>
-                                <RadioButton x:Name="rbCropRatio1x1" Content="1:1" GroupName="CropRatio" Style="{StaticResource SegmentedRadioStyle}" FontSize="10" Padding="6,3" Margin="2,0" Checked="CropRatio_Checked"/>
-
-                                <Button x:Name="btnResetCrop" Content="Reset" Style="{StaticResource SecondaryButtonStyle}" Height="25" Padding="7,2" FontSize="10" Margin="4,0,0,0" Click="BtnResetCrop_Click" ToolTip="Hapus crop manual dan kembali ke ukuran penuh"/>
+                            <!-- Rotate Controls -->
+                            <StackPanel Orientation="Horizontal" Margin="8,0,0,0" VerticalAlignment="Center">
+                                <Button x:Name="btnRotateLeft" Content="↺" Style="{StaticResource SecondaryButtonStyle}" Width="28" Height="28" Padding="0" FontSize="14" FontWeight="Bold" Margin="0,0,3,0" Click="BtnRotateLeft_Click" ToolTip="Putar 90° Berlawanan Jarum Jam (↺)"/>
+                                <Button x:Name="btnRotateRight" Content="↻" Style="{StaticResource SecondaryButtonStyle}" Width="28" Height="28" Padding="0" FontSize="14" FontWeight="Bold" Margin="0,0,0,0" Click="BtnRotateRight_Click" ToolTip="Putar 90° Searah Jarum Jam (↻)"/>
                             </StackPanel>
+
+                            <!-- Toggle Crop Mode Button -->
+                            <ToggleButton x:Name="btnToggleCropMode" Content="✂ Crop" Style="{StaticResource CropToggleButtonStyle}" Margin="8,0,0,0" Click="BtnToggleCropMode_Click" ToolTip="Aktifkan kotak pemotongan crop interaktif di kanvas"/>
                         </StackPanel>
                         <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
                             <!-- AI Processing Indicator -->
@@ -265,20 +272,40 @@
                                 <controls:LoadingSpinner Width="13" Height="13" SpinnerColor="{StaticResource AccentBrush}" TrackColor="#20000000" StrokeThickness="2" Margin="0,0,6,0"/>
                                 <TextBlock Text="AI Matting..." FontSize="11" FontWeight="SemiBold" Foreground="{StaticResource AccentBrush}"/>
                             </StackPanel>
-                            <!-- Active AI Badge -->
-                            <Border x:Name="badgeAiPreviewActive" Background="#16A34A" CornerRadius="4" Padding="7,4" Margin="0,0,8,0" VerticalAlignment="Center" Visibility="Collapsed">
-                                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                                    <TextBlock Text="●" FontSize="8" Foreground="#FFFFFF" Margin="0,0,4,0"/>
-                                    <TextBlock Text="Preview AI Aktif" FontSize="10.5" FontWeight="Bold" Foreground="#FFFFFF"/>
+                            <!-- Segmented Compare Toggle: [ Foto Asli | ✨ Hasil AI ] -->
+                            <Border x:Name="pnlCompareSegmented" Background="{StaticResource BgInputBrush}" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1" CornerRadius="6" Padding="2" VerticalAlignment="Center" Visibility="Collapsed">
+                                <StackPanel Orientation="Horizontal">
+                                    <RadioButton x:Name="rbViewOriginal" Content="Foto Asli" GroupName="CompareView" Style="{StaticResource CompareSegmentedRadioStyle}" Checked="CompareView_Checked" ToolTip="Tampilkan foto asli tanpa editan AI"/>
+                                    <RadioButton x:Name="rbViewAi" Content="✨ Hasil AI" GroupName="CompareView" IsChecked="True" Style="{StaticResource CompareSegmentedRadioStyle}" Checked="CompareView_Checked" ToolTip="Tampilkan hasil pasfoto dengan AI background"/>
                                 </StackPanel>
                             </Border>
-                            <!-- Compare with original button -->
-                            <Button x:Name="btnResetPreview" Content="Bandingkan Asli" Style="{StaticResource SecondaryButtonStyle}" Height="28" Padding="10,2" Visibility="Collapsed" Click="BtnResetPreview_Click" ToolTip="Klik untuk beralih antara foto asli dan preview AI"/>
                         </StackPanel>
                     </Grid>
 
+                    <!-- Row 1: Sub-Baris Khusus Crop (Hanya muncul saat Crop Aktif) -->
+                    <Border x:Name="pnlCropSubBar" Grid.Row="1" Background="{StaticResource BgInputBrush}" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1" CornerRadius="6" Padding="8,5" Margin="0,0,0,8" Visibility="Collapsed">
+                        <DockPanel LastChildFill="False">
+                            <!-- Left: Ratio Locking Group -->
+                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center" DockPanel.Dock="Left">
+                                <TextBlock Text="Kunci Rasio:" FontSize="11" FontWeight="SemiBold" Foreground="{StaticResource TextSecondaryBrush}" VerticalAlignment="Center" Margin="2,0,6,0"/>
+                                <RadioButton x:Name="rbCropRatioFree" Content="Bebas" GroupName="CropRatio" IsChecked="True" Style="{StaticResource SegmentedRadioStyle}" FontSize="10.5" Padding="7,3" Margin="2,0" Checked="CropRatio_Checked"/>
+                                <RadioButton x:Name="rbCropRatio2x3" Content="2:3" GroupName="CropRatio" Style="{StaticResource SegmentedRadioStyle}" FontSize="10.5" Padding="7,3" Margin="2,0" Checked="CropRatio_Checked"/>
+                                <RadioButton x:Name="rbCropRatio3x4" Content="3:4" GroupName="CropRatio" Style="{StaticResource SegmentedRadioStyle}" FontSize="10.5" Padding="7,3" Margin="2,0" Checked="CropRatio_Checked"/>
+                                <RadioButton x:Name="rbCropRatio4x6" Content="4:6" GroupName="CropRatio" Style="{StaticResource SegmentedRadioStyle}" FontSize="10.5" Padding="7,3" Margin="2,0" Checked="CropRatio_Checked"/>
+                                <RadioButton x:Name="rbCropRatio1x1" Content="1:1" GroupName="CropRatio" Style="{StaticResource SegmentedRadioStyle}" FontSize="10.5" Padding="7,3" Margin="2,0" Checked="CropRatio_Checked"/>
+                            </StackPanel>
+
+                            <!-- Right: Action Buttons (Reset, Batal, Selesai) with distinct colors -->
+                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center" DockPanel.Dock="Right">
+                                <Button x:Name="btnResetCrop" Content="↺ Reset" Style="{StaticResource ResetCropButtonStyle}" Height="26" Padding="10,2" FontSize="11" Margin="0,0,6,0" Click="BtnResetCrop_Click" ToolTip="Kembalikan kotak crop ke ukuran penuh"/>
+                                <Button x:Name="btnCancelCrop" Content="✕ Batal" Style="{StaticResource CancelCropButtonStyle}" Height="26" Padding="10,2" FontSize="11" Margin="0,0,6,0" Click="BtnCancelCrop_Click" ToolTip="Batalkan perubahan pemotongan dan kembali ke tampilan sebelumnya"/>
+                                <Button x:Name="btnApplyCrop" Content="✓ Selesai" Style="{StaticResource PrimaryButtonStyle}" Height="26" Padding="12,2" FontSize="11" FontWeight="SemiBold" Click="BtnApplyCrop_Click" ToolTip="Terapkan framing crop dan kembali ke live preview"/>
+                            </StackPanel>
+                        </DockPanel>
+                    </Border>
+
                     <!-- Big Image Canvas Box (Expands to fill entire height and width) -->
-                    <Border Grid.Row="1" Background="{StaticResource BgPreviewBrush}" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1" CornerRadius="8" Margin="0,0,0,8" ClipToBounds="True">
+                    <Border Grid.Row="2" Background="{StaticResource BgPreviewBrush}" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1" CornerRadius="8" Margin="0,0,0,8" ClipToBounds="True">
                         <Grid x:Name="gridPreviewContainer" SizeChanged="GridPreviewContainer_SizeChanged">
                             <!-- Checkerboard/Empty placeholder -->
                             <StackPanel x:Name="pnlPreviewEmpty" VerticalAlignment="Center" HorizontalAlignment="Center">
@@ -339,7 +366,7 @@
                     </Border>
 
                     <!-- Bottom Specs Bar -->
-                    <Border Grid.Row="2" Background="{StaticResource BgInputBrush}" CornerRadius="6" Padding="12,6">
+                    <Border Grid.Row="3" Background="{StaticResource BgInputBrush}" CornerRadius="6" Padding="12,6">
                         <Grid>
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="Auto"/>

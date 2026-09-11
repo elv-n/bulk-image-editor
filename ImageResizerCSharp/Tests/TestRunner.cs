@@ -241,6 +241,49 @@ namespace ImageResizerCSharp.Tests
                 }
                 Console.WriteLine($"[PASS] Free Crop test verified: {cropResult.NewWidth}x{cropResult.NewHeight} px from 1600x1200 source.");
 
+                // 11. Test Image Rotation (90°, 180°, 270°)
+                var testItem = new ImageItem(img1, 500);
+                testItem.SetDimensions(1600, 1200);
+                testItem.RotationAngle = 90;
+                if (testItem.EffectiveWidth != 1200 || testItem.EffectiveHeight != 1600)
+                {
+                    throw new Exception($"ImageItem rotation dimension swap mismatch: Expected 1200x1600, got {testItem.EffectiveWidth}x{testItem.EffectiveHeight}");
+                }
+                if (!testItem.HasRotation)
+                {
+                    throw new Exception("ImageItem HasRotation should be true when RotationAngle is 90.");
+                }
+
+                string outRotated90 = Path.Combine(tempDir, "rotated_90.jpg");
+                var rotResult90 = ImageResizerEngine.ResizeImageToTarget(
+                    img1,
+                    outRotated90,
+                    maxSizeBytes: 300 * 1024,
+                    outputFormat: "JPEG",
+                    photoPresetKey: "Original",
+                    rotationAngle: 90
+                );
+                if (rotResult90.NewWidth != 1200 || rotResult90.NewHeight != 1600)
+                {
+                    throw new Exception($"Rotated 90 output dimension mismatch: Expected 1200x1600, got {rotResult90.NewWidth}x{rotResult90.NewHeight}");
+                }
+                Console.WriteLine($"[PASS] Image Rotation 90° verified: {rotResult90.NewWidth}x{rotResult90.NewHeight} px (swapped from 1600x1200 source).");
+
+                string outRotated180 = Path.Combine(tempDir, "rotated_180.jpg");
+                var rotResult180 = ImageResizerEngine.ResizeImageToTarget(
+                    img1,
+                    outRotated180,
+                    maxSizeBytes: 300 * 1024,
+                    outputFormat: "JPEG",
+                    photoPresetKey: "Original",
+                    rotationAngle: 180
+                );
+                if (rotResult180.NewWidth != 1600 || rotResult180.NewHeight != 1200)
+                {
+                    throw new Exception($"Rotated 180 output dimension mismatch: Expected 1600x1200, got {rotResult180.NewWidth}x{rotResult180.NewHeight}");
+                }
+                Console.WriteLine($"[PASS] Image Rotation 180° verified: {rotResult180.NewWidth}x{rotResult180.NewHeight} px.");
+
                 Console.WriteLine("=== All C# ImageResizer Verification Tests PASSED! ===");
                 return true;
             }

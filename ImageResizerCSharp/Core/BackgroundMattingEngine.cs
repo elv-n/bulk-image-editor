@@ -195,6 +195,7 @@ namespace ImageResizerCSharp.Core
 
         private static readonly object _previewCacheLock = new();
         private static string? _cachedPreviewPath;
+        private static int _cachedPreviewRotation = 0;
         private static Image<Rgba32>? _cachedPreviewSource;
         private static Image<L8>? _cachedPreviewMatte;
 
@@ -203,6 +204,7 @@ namespace ImageResizerCSharp.Core
             lock (_previewCacheLock)
             {
                 _cachedPreviewPath = null;
+                _cachedPreviewRotation = 0;
                 _cachedPreviewSource?.Dispose();
                 _cachedPreviewSource = null;
                 _cachedPreviewMatte?.Dispose();
@@ -290,11 +292,13 @@ namespace ImageResizerCSharp.Core
             string photoPresetKey = "Original",
             int customWidth = 600,
             int customHeight = 800,
-            NormalizedCropRect? customCrop = null)
+            NormalizedCropRect? customCrop = null,
+            int rotationAngle = 0)
         {
             lock (_previewCacheLock)
             {
-                if (_cachedPreviewPath != imagePath || _cachedPreviewSource == null)
+                int normAngle = ((rotationAngle % 360) + 360) % 360;
+                if (_cachedPreviewPath != imagePath || _cachedPreviewRotation != normAngle || _cachedPreviewSource == null)
                 {
                     _cachedPreviewSource?.Dispose();
                     _cachedPreviewMatte?.Dispose();
@@ -303,6 +307,10 @@ namespace ImageResizerCSharp.Core
 
                     var source = SixLabors.ImageSharp.Image.Load<Rgba32>(imagePath);
                     source.Mutate(x => x.AutoOrient());
+
+                    if (normAngle == 90) source.Mutate(x => x.Rotate(RotateMode.Rotate90));
+                    else if (normAngle == 180) source.Mutate(x => x.Rotate(RotateMode.Rotate180));
+                    else if (normAngle == 270) source.Mutate(x => x.Rotate(RotateMode.Rotate270));
 
                     if (source.Width > maxPreviewDimension || source.Height > maxPreviewDimension)
                     {
@@ -315,6 +323,7 @@ namespace ImageResizerCSharp.Core
 
                     _cachedPreviewSource = source;
                     _cachedPreviewPath = imagePath;
+                    _cachedPreviewRotation = normAngle;
                 }
 
                 Image<Rgba32> workingImage;

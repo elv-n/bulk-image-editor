@@ -33,6 +33,8 @@ namespace ImageResizerCSharp
         private bool _isPreviewingAi = false;
         private bool _isCropMode = false;
         private double? _lockedCropRatio = null;
+        private NormalizedCropRect? _previousCropRect = null;
+        private bool _isUpdatingCompareToggle = false;
 
         private static readonly HashSet<string> SupportedExtensions = new(StringComparer.OrdinalIgnoreCase)
         {
@@ -210,8 +212,19 @@ namespace ImageResizerCSharp
             _currentPreviewItem = item;
             _isPreviewingAi = false;
             _lastAiPreviewBitmap = null;
-            if (badgeAiPreviewActive != null) badgeAiPreviewActive.Visibility = Visibility.Collapsed;
-            if (btnResetPreview != null) btnResetPreview.Visibility = Visibility.Collapsed;
+            if (pnlCompareSegmented != null)
+            {
+                pnlCompareSegmented.Visibility = Visibility.Collapsed;
+                _isUpdatingCompareToggle = true;
+                try
+                {
+                    if (rbViewAi != null) rbViewAi.IsChecked = true;
+                }
+                finally
+                {
+                    _isUpdatingCompareToggle = false;
+                }
+            }
 
             try
             {
@@ -221,15 +234,31 @@ namespace ImageResizerCSharp
                 bitmap.CacheOption = BitmapCacheOption.OnLoad;
                 bitmap.EndInit();
 
-                _originalPreviewBitmap = bitmap;
-                imgPreview.Source = bitmap;
+                BitmapSource displayBitmap = bitmap;
+                if (item.RotationAngle != 0)
+                {
+                    try
+                    {
+                        var transformed = new TransformedBitmap();
+                        transformed.BeginInit();
+                        transformed.Source = bitmap;
+                        transformed.Transform = new RotateTransform(item.RotationAngle);
+                        transformed.EndInit();
+                        transformed.Freeze();
+                        displayBitmap = transformed;
+                    }
+                    catch { }
+                }
+
+                _originalPreviewBitmap = displayBitmap;
+                imgPreview.Source = displayBitmap;
                 pnlPreviewEmpty.Visibility = Visibility.Collapsed;
 
                 int targetKb = (int)sliderMaxSize.Value;
                 bool isOver = item.FileSize > (targetKb * 1024L);
                 string tag = isOver ? " (Di atas batas)" : " (Sesuai batas)";
 
-                txtSpecDims.Text = $"Resolusi: {bitmap.PixelWidth} × {bitmap.PixelHeight} px";
+                txtSpecDims.Text = $"Resolusi: {displayBitmap.PixelWidth} × {displayBitmap.PixelHeight} px";
                 txtSpecSize.Text = $"Ukuran: {item.FormattedSize}{tag}";
                 txtSpecSize.Foreground = isOver
                     ? (System.Windows.Media.Brush)FindResource("DangerBrush")
@@ -286,9 +315,11 @@ namespace ImageResizerCSharp
 
             if (_isCropMode)
             {
-                btnToggleCropMode.Content = "✓ Selesai Crop";
-                pnlCropRatioOptions.Visibility = Visibility.Visible;
+                _previousCropRect = _currentPreviewItem.CustomCrop;
+                btnToggleCropMode.Content = "✂ Crop";
+                pnlCropSubBar.Visibility = Visibility.Visible;
                 cropCanvas.Visibility = Visibility.Visible;
+                if (pnlCompareSegmented != null) pnlCompareSegmented.Visibility = Visibility.Collapsed;
 
                 ShowUncroppedPreviewForCropMode();
 
@@ -299,12 +330,34 @@ namespace ImageResizerCSharp
             }
             else
             {
-                btnToggleCropMode.Content = "✂ Crop Bebas";
-                pnlCropRatioOptions.Visibility = Visibility.Collapsed;
+                btnToggleCropMode.Content = "✂ Crop";
+                pnlCropSubBar.Visibility = Visibility.Collapsed;
                 cropCanvas.Visibility = Visibility.Collapsed;
 
                 TriggerAiPreviewAsync();
             }
+        }
+
+        private void BtnApplyCrop_Click(object sender, RoutedEventArgs e)
+        {
+            btnToggleCropMode.IsChecked = false;
+            BtnToggleCropMode_Click(btnToggleCropMode, e);
+        }
+
+        private void BtnCancelCrop_Click(object sender, RoutedEventArgs e)
+        {
+            if (_currentPreviewItem != null)
+            {
+                _currentPreviewItem.CustomCrop = _previousCropRect;
+            }
+
+            _isCropMode = false;
+            btnToggleCropMode.IsChecked = false;
+            btnToggleCropMode.Content = "✂ Crop";
+            pnlCropSubBar.Visibility = Visibility.Collapsed;
+            cropCanvas.Visibility = Visibility.Collapsed;
+
+            TriggerAiPreviewAsync();
         }
 
         private async void ShowUncroppedPreviewForCropMode()
@@ -325,6 +378,7 @@ namespace ImageResizerCSharp
             {
                 try
                 {
+                    int rot = _currentPreviewItem?.RotationAngle ?? 0;
                     var previewBitmap = await Task.Run(() =>
                     {
                         return BackgroundMattingEngine.GeneratePreviewBitmap(
@@ -335,7 +389,8 @@ namespace ImageResizerCSharp
                             "Original",
                             600,
                             800,
-                            null
+                            null,
+                            rot
                         );
                     });
 
@@ -683,8 +738,19 @@ namespace ImageResizerCSharp
                 {
                     imgPreview.Source = _originalPreviewBitmap;
                     _isPreviewingAi = false;
-                    if (badgeAiPreviewActive != null) badgeAiPreviewActive.Visibility = Visibility.Collapsed;
-                    if (btnResetPreview != null) btnResetPreview.Visibility = Visibility.Collapsed;
+                    if (pnlCompareSegmented != null)
+                    {
+                        pnlCompareSegmented.Visibility = Visibility.Collapsed;
+                        _isUpdatingCompareToggle = true;
+                        try
+                        {
+                            if (rbViewAi != null) rbViewAi.IsChecked = true;
+                        }
+                        finally
+                        {
+                            _isUpdatingCompareToggle = false;
+                        }
+                    }
 
                     txtSpecDims.Text = $"Resolusi: {_originalPreviewBitmap.PixelWidth} × {_originalPreviewBitmap.PixelHeight} px";
                 }
@@ -701,6 +767,7 @@ namespace ImageResizerCSharp
                 pnlAiLoading.Visibility = Visibility.Visible;
             }
 
+            int rot = _currentPreviewItem.RotationAngle;
             try
             {
                 var previewBitmap = await Task.Run(() =>
@@ -713,7 +780,8 @@ namespace ImageResizerCSharp
                         preset,
                         customW,
                         customH,
-                        customCrop
+                        customCrop,
+                        rot
                     );
                 });
 
@@ -723,21 +791,24 @@ namespace ImageResizerCSharp
                     imgPreview.Source = previewBitmap;
                     _isPreviewingAi = (bgToPreview != PhotoBackgroundType.None);
 
-                    if (badgeAiPreviewActive != null)
-                    {
-                        badgeAiPreviewActive.Visibility = _isPreviewingAi ? Visibility.Visible : Visibility.Collapsed;
-                    }
-
-                    if (btnResetPreview != null)
+                    if (pnlCompareSegmented != null && !_isCropMode)
                     {
                         if (bgToPreview != PhotoBackgroundType.None)
                         {
-                            btnResetPreview.Visibility = Visibility.Visible;
-                            btnResetPreview.Content = "Bandingkan Asli";
+                            pnlCompareSegmented.Visibility = Visibility.Visible;
+                            _isUpdatingCompareToggle = true;
+                            try
+                            {
+                                if (rbViewAi != null) rbViewAi.IsChecked = true;
+                            }
+                            finally
+                            {
+                                _isUpdatingCompareToggle = false;
+                            }
                         }
                         else
                         {
-                            btnResetPreview.Visibility = Visibility.Collapsed;
+                            pnlCompareSegmented.Visibility = Visibility.Collapsed;
                         }
                     }
 
@@ -745,7 +816,7 @@ namespace ImageResizerCSharp
                     {
                         int cw = (int)Math.Round(customCrop.Width * _originalPreviewBitmap.PixelWidth);
                         int ch = (int)Math.Round(customCrop.Height * _originalPreviewBitmap.PixelHeight);
-                        txtSpecDims.Text = $"Crop Bebas: {cw} × {ch} px";
+                        txtSpecDims.Text = $"Crop: {cw} × {ch} px";
                     }
                     else
                     {
@@ -774,17 +845,20 @@ namespace ImageResizerCSharp
             }
         }
 
-        private async void BtnResetPreview_Click(object sender, RoutedEventArgs e)
+        private async void CompareView_Checked(object sender, RoutedEventArgs e)
         {
-            if (_currentPreviewItem == null) return;
+            if (_isUpdatingCompareToggle || _currentPreviewItem == null) return;
 
+            bool isViewingOriginal = rbViewOriginal?.IsChecked == true;
             string preset = GetSelectedPresetKey();
             var (customW, customH) = GetCustomDimensions();
             string filePath = _currentPreviewItem.FilePath;
             var customCrop = _currentPreviewItem.CustomCrop;
+            int rot = _currentPreviewItem.RotationAngle;
 
-            if (_isPreviewingAi)
+            if (isViewingOriginal)
             {
+                // Tampilkan Foto Asli (dengan crop kustom jika ada)
                 var origCropped = await Task.Run(() =>
                 {
                     return BackgroundMattingEngine.GeneratePreviewBitmap(
@@ -795,21 +869,26 @@ namespace ImageResizerCSharp
                         preset,
                         customW,
                         customH,
-                        customCrop
+                        customCrop,
+                        rot
                     );
                 });
 
                 imgPreview.Source = origCropped;
                 _isPreviewingAi = false;
-                if (badgeAiPreviewActive != null) badgeAiPreviewActive.Visibility = Visibility.Collapsed;
-                btnResetPreview.Content = "Lihat AI";
             }
-            else if (_lastAiPreviewBitmap != null)
+            else
             {
-                imgPreview.Source = _lastAiPreviewBitmap;
-                _isPreviewingAi = true;
-                if (badgeAiPreviewActive != null) badgeAiPreviewActive.Visibility = Visibility.Visible;
-                btnResetPreview.Content = "Bandingkan Asli";
+                // Tampilkan Hasil AI
+                if (_lastAiPreviewBitmap != null)
+                {
+                    imgPreview.Source = _lastAiPreviewBitmap;
+                    _isPreviewingAi = true;
+                }
+                else
+                {
+                    TriggerAiPreviewAsync();
+                }
             }
         }
 
@@ -1176,6 +1255,78 @@ namespace ImageResizerCSharp
                     FileName = _lastSuccessfulOutputDir,
                     UseShellExecute = true
                 });
+            }
+        }
+
+        // ─── Image Rotation Controls ─────────────────────────────────────────────
+
+        private void BtnRotateLeft_Click(object sender, RoutedEventArgs e)
+        {
+            RotateCurrentItem(-90);
+        }
+
+        private void BtnRotateRight_Click(object sender, RoutedEventArgs e)
+        {
+            RotateCurrentItem(90);
+        }
+
+        private void MenuItemRotateLeft_Click(object sender, RoutedEventArgs e)
+        {
+            RotateCurrentItem(-90);
+        }
+
+        private void MenuItemRotateRight_Click(object sender, RoutedEventArgs e)
+        {
+            RotateCurrentItem(90);
+        }
+
+        private void MenuItemRotate180_Click(object sender, RoutedEventArgs e)
+        {
+            RotateCurrentItem(180);
+        }
+
+        private void MenuItemRotateAll_Click(object sender, RoutedEventArgs e)
+        {
+            if (_currentPreviewItem == null) return;
+            int angle = _currentPreviewItem.RotationAngle;
+            foreach (var item in _imageItems)
+            {
+                if (item.IsChecked)
+                {
+                    if (item.CustomCrop != null) item.CustomCrop = null;
+                    item.RotationAngle = angle;
+                }
+            }
+            ShowPreview(_currentPreviewItem);
+        }
+
+        private void MenuItemResetRotation_Click(object sender, RoutedEventArgs e)
+        {
+            if (_currentPreviewItem == null) return;
+            if (_currentPreviewItem.CustomCrop != null) _currentPreviewItem.CustomCrop = null;
+            _currentPreviewItem.RotationAngle = 0;
+            ShowPreview(_currentPreviewItem);
+        }
+
+        private void RotateCurrentItem(int deltaAngle)
+        {
+            if (_currentPreviewItem == null) return;
+
+            // Reset crop kustom jika orientasi foto diputar
+            if (_currentPreviewItem.CustomCrop != null)
+            {
+                _currentPreviewItem.CustomCrop = null;
+            }
+
+            _currentPreviewItem.RotationAngle = (_currentPreviewItem.RotationAngle + deltaAngle + 360) % 360;
+            ShowPreview(_currentPreviewItem);
+
+            if (_isCropMode)
+            {
+                Dispatcher.BeginInvoke(new Action(() =>
+                {
+                    InitCropBoxPosition();
+                }), System.Windows.Threading.DispatcherPriority.Loaded);
             }
         }
     }

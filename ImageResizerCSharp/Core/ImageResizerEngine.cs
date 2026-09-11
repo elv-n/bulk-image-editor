@@ -120,7 +120,8 @@ namespace ImageResizerCSharp.Core
             bool maximizeQuality = true,
             PhotoBackgroundType bgType = PhotoBackgroundType.None,
             string customBgHex = "",
-            NormalizedCropRect? customCrop = null)
+            NormalizedCropRect? customCrop = null,
+            int rotationAngle = 0)
         {
             var originalFileInfo = new FileInfo(inputPath);
             long originalSize = originalFileInfo.Length;
@@ -135,11 +136,26 @@ namespace ImageResizerCSharp.Core
             using var loadedImage = Image.Load<SixLabors.ImageSharp.PixelFormats.Rgba32>(inputPath);
             loadedImage.Mutate(x => x.AutoOrient());
 
+            // Terapkan rotasi jika ada sebelum pemotongan atau modifikasi
+            int normAngle = ((rotationAngle % 360) + 360) % 360;
+            if (normAngle == 90)
+            {
+                loadedImage.Mutate(x => x.Rotate(RotateMode.Rotate90));
+            }
+            else if (normAngle == 180)
+            {
+                loadedImage.Mutate(x => x.Rotate(RotateMode.Rotate180));
+            }
+            else if (normAngle == 270)
+            {
+                loadedImage.Mutate(x => x.Rotate(RotateMode.Rotate270));
+            }
+
             var presetDims = GetPresetDimensions(photoPresetKey, customWidth, customHeight);
 
-            // If format unchanged, preset is original, no custom crop, no background change, and already within target size: skip with copy
+            // If format unchanged, preset is original, no custom crop, no rotation, no background change, and already within target size: skip with copy
             bool isSameFormat = string.Equals(Path.GetExtension(inputPath), GetFormatExtension(outputFormat), StringComparison.OrdinalIgnoreCase);
-            if (customCrop == null && photoPresetKey == "Original" && bgType == PhotoBackgroundType.None && isSameFormat && originalSize <= maxSizeBytes)
+            if (customCrop == null && normAngle == 0 && photoPresetKey == "Original" && bgType == PhotoBackgroundType.None && isSameFormat && originalSize <= maxSizeBytes)
             {
                 if (!string.Equals(inputPath, outputPath, StringComparison.OrdinalIgnoreCase))
                 {
@@ -458,7 +474,8 @@ namespace ImageResizerCSharp.Core
                         maximizeQuality,
                         bgType,
                         customBgHex,
-                        customCrop: item.CustomCrop
+                        customCrop: item.CustomCrop,
+                        rotationAngle: item.RotationAngle
                     );
 
                     int cur = Interlocked.Increment(ref completed);

@@ -42,6 +42,8 @@ namespace ImageResizerCSharp.Models
         private ProcessingStatus _status = ProcessingStatus.Pending;
         private string _statusMessage = string.Empty;
         private ImageSource? _thumbnail;
+        private BitmapSource? _baseThumbnail;
+        private int _rotationAngle = 0;
         private int _originalWidth;
         private int _originalHeight;
         private string _dimensionsText = "memuat...";
@@ -98,10 +100,66 @@ namespace ImageResizerCSharp.Models
             set => SetField(ref _statusMessage, value);
         }
 
+        public int RotationAngle
+        {
+            get => _rotationAngle;
+            set
+            {
+                int normalized = ((value % 360) + 360) % 360;
+                if (_rotationAngle != normalized)
+                {
+                    _rotationAngle = normalized;
+                    OnPropertyChanged();
+                    OnPropertyChanged(nameof(HasRotation));
+                    OnPropertyChanged(nameof(EffectiveWidth));
+                    OnPropertyChanged(nameof(EffectiveHeight));
+                    OnPropertyChanged(nameof(DimensionsText));
+                    OnPropertyChanged(nameof(InfoText));
+                    UpdateRotatedThumbnail();
+                }
+            }
+        }
+
+        public bool HasRotation => _rotationAngle != 0;
+
         public ImageSource? Thumbnail
         {
             get => _thumbnail;
-            set => SetField(ref _thumbnail, value);
+            set
+            {
+                _baseThumbnail = value as BitmapSource;
+                UpdateRotatedThumbnail();
+            }
+        }
+
+        private void UpdateRotatedThumbnail()
+        {
+            if (_baseThumbnail == null)
+            {
+                _thumbnail = null;
+            }
+            else if (_rotationAngle == 0)
+            {
+                _thumbnail = _baseThumbnail;
+            }
+            else
+            {
+                try
+                {
+                    var transformed = new TransformedBitmap();
+                    transformed.BeginInit();
+                    transformed.Source = _baseThumbnail;
+                    transformed.Transform = new RotateTransform(_rotationAngle);
+                    transformed.EndInit();
+                    transformed.Freeze();
+                    _thumbnail = transformed;
+                }
+                catch
+                {
+                    _thumbnail = _baseThumbnail;
+                }
+            }
+            OnPropertyChanged(nameof(Thumbnail));
         }
 
         public int OriginalWidth
@@ -116,9 +174,16 @@ namespace ImageResizerCSharp.Models
             set => SetField(ref _originalHeight, value);
         }
 
+        public int EffectiveWidth => (_rotationAngle == 90 || _rotationAngle == 270) ? _originalHeight : _originalWidth;
+        public int EffectiveHeight => (_rotationAngle == 90 || _rotationAngle == 270) ? _originalWidth : _originalHeight;
+
         public string DimensionsText
         {
-            get => _dimensionsText;
+            get
+            {
+                if (_originalWidth <= 0 || _originalHeight <= 0) return _dimensionsText;
+                return $"{EffectiveWidth}×{EffectiveHeight} px";
+            }
             set => SetField(ref _dimensionsText, value);
         }
 
@@ -129,8 +194,9 @@ namespace ImageResizerCSharp.Models
             get
             {
                 var tag = IsOverLimit ? " • Di atas batas" : "";
+                var rotTag = HasRotation ? $" • ↻ {_rotationAngle}°" : "";
                 var cropTag = HasCustomCrop ? " • ✂ Crop" : "";
-                return $"{FormattedSize} • {DimensionsText}{cropTag}{tag}";
+                return $"{FormattedSize} • {DimensionsText}{rotTag}{cropTag}{tag}";
             }
         }
 
